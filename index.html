@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Front-End</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- ENHANCEMENT: Added Chart.js and the annotation plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    
+    <!-- Supabase Configuration -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // Supabase Configuration
+      const SUPABASE_URL = 'https://xxqesoposwpvljxdfkim.supabase.co'; // Replace with your Supabase URL
+      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4cWVzb3Bvc3dwdmxqeGRma2ltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNTU1NDcsImV4cCI6MjA3NDkzMTU0N30.zCJvWNnoKxTlOxJgos8dqfoVYqlXvsfk7_GbjGyt2jo'; // Replace with your Supabase Anon Key
+      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    </script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .field-input { width: 100%; padding: 0.25rem; text-align: center; border-radius: 0.25rem; border: 1px solid #d1d5db; transition: background-color 0.2s; }
+        .field-input:focus { outline: none; ring: 2px; ring-color: #3b82f6; }
+        .field-input:disabled { background-color: #f3f4f6; cursor: not-allowed; }
+        .field-label { font-size: 0.65rem; color: #6b7280; margin-top: 1px; }
+        .green-field { background-color: #dcfce7; }
+        .yellow-field { background-color: #fef9c3; }
+        .task-item { transition: background-color 0.2s; cursor: pointer; }
+        .task-item:hover { background-color: #f3f4f6; }
+        .overdue-task { border-left: 4px solid #ef4444; }
+        .today-task { border-left: 4px solid #f59e0b; }
+        .future-task { border-left: 4px solid #10b981; }
+        .phone-row { transition: all 0.2s; border-radius: 0.375rem; padding: 0.5rem; margin-bottom: 0.25rem; }
+        .phone-worked { background-color: #dcfce7; border: 1px solid #bbf7d0; }
+        .phone-unworked { background-color: #ffffff; border: 1px solid #e5e7eb; }
+        .owner-item { transition: background-color 0.2s; cursor: pointer; }
+        .owner-item:hover { background-color: #f9fafb; }
+        .owner-item.active { background-color: #dbeafe; border-left: 4px solid #3b82f6; }
+        .status-tag { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; margin: 0.125rem; cursor: pointer; }
+        .marker-option { padding: 0.25rem 0.5rem; border-radius: 0.25rem; margin: 0.125rem 0; font-size: 0.75rem; font-weight: 500; color: white; }
+        .marker-ipa { background-color: #1f2937; }
+        .marker-spoken { background-color: #10b981; }
+        .marker-listed { background-color: #f59e0b; }
+        .marker-wr { background-color: #eab308; color: #000; }
+        .marker-never { background-color: #3b82f6; }
+        .marker-condo { background-color: #ec4899; }
+        .marker-broker { background-color: #8b5cf6; }
+        .marker-tcg { background-color: #1f2937; }
+        .tag-buyer { background-color: #bfdbfe; color: #1e40af; }
+        .tag-seller { background-color: #fed7aa; color: #9a3412; }
+        .tag-meeting { background-color: #d8b4fe; color: #6b21a8; }
+        .tag-proposal { background-color: #6ee7b7; color: #065f46; }
+        .tag-1031 { background-color: #fde047; color: #854d0e; }
+        .tag-talker { background-color: #f9a8d4; color: #9d174d; }
+        .tag-6months { background-color: #fca5a5; color: #991b1b; }
+        .tag-market { background-color: #a7f3d0; color: #047857; }
+        .tag-developer { background-color: #e0e7ff; color: #3730a3; }
+        .tag-ipa { background-color: #d1d5db; color: #1f2937; }
+        .tag-email { background-color: #bae6fd; color: #0c4a6e; }
+        /* Location Color Classes */
+        .location-far-out-se { background-color: #ffffff; color: #374151; border-color: #d1d5db; }
+        .location-se-portland { background-color: #dcfce7; color: #166534; border-color: #16a34a; }
+        .location-nw-portland { background-color: #fce7f3; color: #9d174d; border-color: #ec4899; }
+        .location-n-portland { background-color: #f3e8ff; color: #7e22ce; border-color: #a855f7; }
+        .location-nw-downtown-portland { background-color: #fee2e2; color: #991b1b; border-color: #ef4444; }
+        .location-corvallis { background-color: #ffedd5; color: #9a3412; border-color: #f97316; }
+        .location-eugene-springfield { background-color: #fef9c3; color: #854d0e; border-color: #eab308; }
+        .location-default { background-color: #e5e7eb; color: #4b5563; border-color: #9ca3af; }
+        .template-tag { background-color: #e5e7eb; color: #4b5563; padding: 2px 8px; margin: 2px; border-radius: 12px; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; transition: background-color 0.2s; }
+        .template-tag:hover { background-color: #d1d5db; }
+        .template-tag-delete { margin-left: 6px; color: #9ca3af; font-weight: bold; line-height: 1; padding: 2px; border-radius: 50%; }
+        .template-tag-delete:hover { color: #1f2937; background-color: #f3f4f6;}
+    </style>
+</head>
+<body class="bg-gray-100" x-data="crm" x-cloak>
+
+<div x-show="isLoading" class="fixed inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center z-[9999]">
+    <div class="loader"></div>
+    <p class="text-white mt-4" x-text="loadingMessage"></p>
+</div>
+
+<div x-show="isAddingProperty" class="fixed inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center z-[9999]">
+    <div class="loader"></div>
+    <p class="text-white mt-4" x-text="addPropertyStatusMessage || 'Adding property...'"></p>
+    <template x-if="addPropertyStatusMessage">
+        <div class="mt-4">
+            <button @click="pollForProperty(propertyBeingAddedAddress)" class="bg-blue-500 text-white px-4 py-2 rounded text-sm mr-2">Retry Check</button>
+            <button @click="isAddingProperty = false; addPropertyStatusMessage = '';" class="bg-gray-500 text-white px-4 py-2 rounded text-sm">Close</button>
+        </div>
+    </template>
+</div>
+
+<div class="h-screen flex flex-col">
+    <!-- HEADER -->
+    <header class="bg-blue-800 text-white p-2 flex justify-between items-center flex-shrink-0">
+        <div class="flex-1 flex items-center gap-4">
+            <div class="flex items-center w-full max-w-md">
+                <div class="relative w-full">
+                    <input
+                        type="text"
+                        x-model="globalSearchQuery"
+                        @input.debounce.300ms="updateGlobalSearch"
+                        @keydown.down.prevent="navigateGlobalSearch(1)"
+                        @keydown.up.prevent="navigateGlobalSearch(-1)"
+                        @keydown.enter.prevent="selectHighlightedGlobalResult"
+                        @keydown.escape.window="hideGlobalSearchDropdown"
+                        placeholder="Search Owner or Address..."
+                        class="w-full p-2 rounded-l bg-blue-700 placeholder-gray-300"
+                        autocomplete="off"
+                    >
+                    <div
+                        x-show="showGlobalSearchDropdown"
+                        @click.away="hideGlobalSearchDropdown"
+                        class="absolute top-full left-0 w-full bg-white border rounded shadow-lg z-20 max-h-72 overflow-y-auto mt-1"
+                        x-transition
+                    >
+                        <template x-if="globalSearchResults.length > 0">
+                            <template x-for="(result, index) in globalSearchResults" :key="result.key">
+                                <div
+                                    @click="selectGlobalResult(result)"
+                                    @mouseenter="globalSearchHighlightIndex = index"
+                                    class="p-2 hover:bg-gray-100 cursor-pointer border-b text-gray-800"
+                                    :class="{'bg-blue-100': globalSearchHighlightIndex === index}"
+                                >
+                                    <p class="font-bold text-sm" x-text="result.name"></p>
+                                    <p class="text-xs text-gray-600" x-text="result.context"></p>
+                                </div>
+                            </template>
+                        </template>
+                        <template x-if="globalSearchResults.length === 0 && globalSearchQuery.length >= 2">
+                            <div class="p-3 text-center text-sm text-gray-500">
+                                No results found for '<span class="font-semibold" x-text="globalSearchQuery"></span>'
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <button @click="focusOnFirstMatch()" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-r flex items-center justify-center" title="Jump to first match">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            <div class="flex items-center gap-1">
+                <input type="date" x-model="newDateFilter" class="p-1 rounded text-black text-sm" title="Set a new date for tasks">
+                <button @click="applyDateFilter()" class="bg-blue-600 hover:bg-blue-500 text-white p-1.5 rounded flex items-center justify-center" title="Apply Date Filter">
+                    <i class="fas fa-calendar-check text-xs"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 flex justify-center items-center gap-4">
+            <button @click="showFilterModal=true" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded flex items-center gap-2">
+                <i class="fas fa-filter"></i>
+                <span class="text-sm">Filter Properties</span>
+            </button>
+            <button @click="openStatusBreakdownModal()" class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1 rounded flex items-center gap-2">
+                <i class="fas fa-chart-pie"></i>
+                <span class="text-sm">Status Breakdown</span>
+            </button>
+            <button @click="openCallTracker()" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded flex items-center gap-2">
+                <i class="fas fa-phone-alt"></i>
+                <span class="text-sm">Call Tracker</span>
+            </button>
+        </div>
+
+        <div class="flex-1 flex justify-end gap-2">
+            <button @click="showAddOwnerModal=true" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded flex items-center gap-2">
+                <i class="fas fa-user-plus"></i>
+                <span class="text-xs">Add Owner</span>
+            </button>
+            <button @click="showAddPropertyModal=true" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded flex items-center gap-2">
+                <i class="fas fa-home"></i>
+                <span class="text-xs">Add Property</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN LAYOUT -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- LEFT PANEL: Owners List + Follow-Up Tasks -->
+        <aside class="w-1/4 bg-white border-r flex flex-col">
+            <div class="h-1/2 border-b flex flex-col">
+                <div class="p-3 border-b bg-gray-50">
+                    <h2 class="text-lg font-bold text-blue-800">Owners (<span x-text="softSortedOwners.length"></span>)</h2>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2" x-ref="ownerListContainer">
+                    <template x-for="owner in softSortedOwners" :key="owner.id">
+                        <div
+                            class="owner-item p-2 rounded mb-1 group"
+                            :id="'owner-item-' + owner.id"
+                            :class="{'active': activeOwner && activeOwner.id === owner.id, 'bg-yellow-100 border-l-4 border-yellow-400': isMatch(owner)}"
+                            @click="selectOwner(owner.id)"
+                        >
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-bold text-sm truncate" x-text="owner.name"></p>
+                                    <p class="text-xs text-gray-600" x-text="`${(owner.properties || []).length} Propert${(owner.properties || []).length === 1 ? 'y' : 'ies'}`"></p>
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <div class="w-4 h-4 rounded-full ring-1 ring-inset ring-gray-400" :class="getMarkerClass(owner.status, 'bg')" title="Owner Status"></div>
+                                    <button @click.stop="confirmDeleteOwner(owner)" class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete Owner"><i class="fas fa-trash text-xs"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="softSortedOwners.length === 0" class="p-4 text-center text-gray-500 text-sm">No owners match your filters.</div>
+                </div>
+            </div>
+            <div class="h-1/2 flex flex-col">
+                <div class="p-3 border-b bg-gray-50">
+                    <h2 class="text-lg font-bold text-blue-800 mb-2">Follow-Up Tasks (<span x-text="filteredFollowUpTasks.length"></span>)</h2>
+                    <select x-model="taskFilter" class="w-full p-1 border rounded text-sm">
+                        <option value="today">📅 Today's Tasks</option>
+                        <option value="overdue">🚨 Overdue Tasks</option>
+                        <option value="all">📚 All Tasks</option>
+                    </select>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                    <template x-for="task in filteredFollowUpTasks" :key="task.ownerId + task.dueDate">
+                        <div @click="selectOwner(task.ownerId)" class="task-item p-3 border-b border-gray-100" :class="getTaskClass(task.status)">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p class="font-medium text-sm" x-text="task.ownerName"></p>
+                                    <p class="text-xs text-gray-600" x-text="`${task.propertyCount} Propert${task.propertyCount === 1 ? 'y' : 'ies'}`"></p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs" :class="{'text-red-600 font-bold': task.status === 'overdue', 'text-gray-800': task.status !== 'overdue'}" x-text="formatTaskDate(task.dueDate)"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="filteredFollowUpTasks.length === 0" class="p-4 text-center text-gray-500 text-sm">No tasks found.</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MIDDLE & RIGHT PANELS -->
+        <template x-if="activeOwner">
+            <div class="w-3/4 flex overflow-hidden">
+                <main class="w-2/3 bg-white p-3 flex flex-col gap-2 overflow-y-auto border-l">
+                    <div class="flex items-center justify-between bg-gray-50 p-3 rounded mb-2">
+                        <button @click="previousProperty()" class="bg-blue-500 text-white px-3 py-2 rounded flex items-center gap-1" :disabled="!activeOwner || (activeOwner.properties || []).length <= 1"><i class="fas fa-chevron-left"></i></button>
+                        <div class="text-center flex-1">
+                            <div class="flex items-center justify-center gap-2 mb-1 h-[38px]">
+                                <template x-if="!isEditingOwnerName">
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-lg font-bold text-blue-800" x-text="activeOwner.name"></p>
+                                        <button @click="startEditOwnerName()" class="text-green-600 hover:text-green-800" title="Edit Owner Name">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                                <template x-if="isEditingOwnerName">
+                                    <div class="flex items-center gap-1">
+                                        <input type="text"
+                                            x-model="editingOwnerNameValue"
+                                            @keydown.enter.prevent="saveOwnerName()"
+                                            @keydown.escape.prevent="cancelEditOwnerName()"
+                                            class="field-input text-lg font-bold"
+                                            x-ref="ownerNameInput"
+                                            style="width: auto; min-width: 200px; padding: 0.25rem 0.5rem;">
+                                        <button @click="saveOwnerName()" class="bg-green-500 text-white rounded w-8 h-8 flex items-center justify-center hover:bg-green-600" title="Save">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button @click="cancelEditOwnerName()" class="bg-gray-400 text-white rounded w-8 h-8 flex items-center justify-center hover:bg-gray-500" title="Cancel">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                            <template x-if="activeProperty">
+                                <p class="text-sm font-medium" x-show="(activeOwner.properties || []).length > 0">Property <span x-text="activePropertyIndex + 1"></span> of <span x-text="(activeOwner.properties || []).length"></span></p>
+                            </template>
+                            <template x-if="!activeProperty">
+                                <p class="text-xs text-gray-500">Owner has no properties</p>
+                            </template>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="nextProperty()" class="bg-blue-500 text-white px-3 py-2 rounded flex items-center gap-1" :disabled="!activeOwner || (activeOwner.properties || []).length <= 1"><i class="fas fa-chevron-right"></i></button>
+                            <button @click="openChangeOwnerModal()" class="bg-yellow-500 text-white px-2 py-2 rounded hover:bg-yellow-600" title="Change Owner" :disabled="!activeProperty"><i class="fas fa-random"></i></button>
+                            <button @click="confirmDeleteProperty()" class="bg-red-500 text-white px-2 py-2 rounded hover:bg-red-600" title="Delete Property" :disabled="!activeProperty"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+
+                    <template x-if="activeProperty">
+                        <div>
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <template x-for="(image, index) in activeProperty.images" :key="index">
+                                     <div class="w-full h-40 flex items-center justify-center bg-gray-100 rounded border-2 border-dashed relative group">
+                                        <img :src="image" class="w-full h-full object-cover rounded">
+                                        <button @click="removeImage(index)" class="absolute bottom-1 right-1 bg-red-500 bg-opacity-70 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity">X</button>
+                                    </div>
+                                </template>
+                                 <div class="w-full h-40 flex items-center justify-center bg-gray-100 rounded border-2 border-dashed relative group">
+                                    <span class="text-gray-400 text-3xl">No Image</span>
+                                    <button @click="openImageModal(activeProperty.images.length)" class="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-opacity-70">+</button>
+                                </div>
+                            </div>
+
+                            <h3 class="text-blue-800 font-bold text-base mb-2">Property Information</h3>
+                            <div class="border rounded p-2 space-y-1">
+                                <div class="flex gap-2">
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.address)" x-model="activeProperty.address" @blur="autoSave()"><span class="field-label">Address</span></div>
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.propertyName)" x-model="activeProperty.propertyName" @blur="autoSave()"><span class="field-label">Property Name</span></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.city)" x-model="activeProperty.city" @blur="autoSave()"><span class="field-label">City</span></div>
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.state)" x-model="activeProperty.state" @blur="autoSave()"><span class="field-label">State</span></div>
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.zip)" x-model="activeProperty.zip" @blur="autoSave()"><span class="field-label">ZIP</span></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="flex-1 text-center"><input type="number" class="field-input" :class="getFieldColor(activeProperty.yearBuilt)" x-model.number="activeProperty.yearBuilt" @blur="autoSave()"><span class="field-label">Year Built</span></div>
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.submarket)" x-model="activeProperty.submarket" @blur="autoSave()"><span class="field-label">Submarket</span></div>
+                                    <div class="flex-1 text-center relative" x-data="{ showLocationDropdown: false }">
+                                        <button @click="showLocationDropdown = !showLocationDropdown" class="w-full field-input font-medium text-sm flex items-center justify-between border-2" :class="getLocationClass(activeProperty.location)">
+                                            <span x-text="activeProperty.location || 'Select Location'"></span><i class="fas fa-chevron-down text-xs"></i>
+                                        </button>
+                                        <div x-show="showLocationDropdown" @click.away="showLocationDropdown = false" class="absolute top-full left-0 right-0 bg-white border rounded shadow-lg z-10 mt-1">
+                                            <template x-for="loc in locationOptions" :key="loc.value">
+                                                <div @click="activeProperty.location = loc.value; showLocationDropdown = false; autoSave()" class="p-2 text-sm cursor-pointer hover:bg-gray-100" x-text="loc.value"></div>
+                                            </template>
+                                            <div @click="activeProperty.location = ''; showLocationDropdown = false; autoSave()" class="p-2 text-sm text-gray-500 cursor-pointer hover:bg-gray-100 border-t">Clear</div>
+                                        </div>
+                                        <span class="field-label">Location</span>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.parcelNumber)" x-model="activeProperty.parcelNumber" @blur="autoSave()"><span class="field-label">Parcel #</span></div>
+                                    <div class="flex-1 text-center"><input type="text" class="field-input bg-gray-100 cursor-not-allowed" :value="activeProperty.id" disabled><span class="field-label">Property ID</span></div>
+                                    <div class="flex-1 text-center"><input type="text" class="field-input" :class="getFieldColor(activeProperty.costarNumber)" x-model="activeProperty.costarNumber" @blur="autoSave()"><span class="field-label">Costar #</span></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="flex-1 text-center"><input type="number" class="field-input" :class="getFieldColor(activeProperty.units)" x-model.number="activeProperty.units" @blur="autoSave()"><span class="field-label">Units</span></div>
+                                    <div class="flex-1 text-center">
+                                        <input type="number" step="any" class="field-input" :class="getFieldColor(activeProperty.longitude)" x-model.number="activeProperty.longitude" @blur="autoSave(); initializeOrUpdateMap()">
+                                        <span class="field-label">Longitude</span>
+                                    </div>
+                                    <div class="flex-1 text-center">
+                                        <input type="number" step="any" class="field-input" :class="getFieldColor(activeProperty.latitude)" x-model.number="activeProperty.latitude" @blur="autoSave(); initializeOrUpdateMap()">
+                                        <span class="field-label">Latitude</span>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2 pt-2">
+                                    <div class="text-center" x-data="{ isEditingLink: false }">
+                                        <div x-show="!isEditingLink" class="flex items-center justify-center gap-2 h-[34px]">
+                                            <a :href="activeProperty.coStarLink" target="_blank" x-show="activeProperty.coStarLink" class="bg-blue-500 text-white px-3 py-1 rounded text-sm font-medium hover:bg-blue-600">CoStar</a>
+                                            <span x-show="!activeProperty.coStarLink" class="text-sm text-gray-400 italic">No Link</span>
+                                            <button @click="isEditingLink = true; $nextTick(() => $refs.coStarInput.focus())" title="Add/Change CoStar Link" class="text-blue-500 hover:text-blue-700"><i class="fas fa-plus-circle"></i></button>
+                                        </div>
+                                        <div x-show="isEditingLink" class="flex items-center gap-1">
+                                            <input type="url" class="field-input" :class="getFieldColor(activeProperty.coStarLink)" x-model="activeProperty.coStarLink" placeholder="Paste URL" @keydown.enter.prevent="isEditingLink = false; autoSave()" @blur="isEditingLink = false; autoSave()" x-ref="coStarInput">
+                                        </div>
+                                        <span class="field-label">CoStar Link</span>
+                                    </div>
+                                    <div class="text-center" x-data="{ isEditingLink: false }">
+                                        <div x-show="!isEditingLink" class="flex items-center justify-center gap-2 h-[34px]">
+                                            <a :href="activeProperty.tpsLink" target="_blank" x-show="activeProperty.tpsLink" class="bg-gray-500 text-white px-3 py-1 rounded text-sm font-medium hover:bg-gray-600">TPS</a>
+                                            <span x-show="!activeProperty.tpsLink" class="text-sm text-gray-400 italic">No Link</span>
+                                            <button @click="isEditingLink = true; $nextTick(() => $refs.tpsInput.focus())" title="Add/Change TPS Link" class="text-blue-500 hover:text-blue-700"><i class="fas fa-plus-circle"></i></button>
+                                        </div>
+                                        <div x-show="isEditingLink" class="flex items-center gap-1">
+                                            <input type="url" class="field-input" :class="getFieldColor(activeProperty.tpsLink)" x-model="activeProperty.tpsLink" placeholder="Paste URL" @keydown.enter.prevent="isEditingLink = false; autoSave()" @blur="isEditingLink = false; autoSave()" x-ref="tpsInput">
+                                        </div>
+                                        <span class="field-label">TPS Link</span>
+                                    </div>
+                                    <div class="text-center" x-data="{ isEditingLink: false }">
+                                        <div x-show="!isEditingLink" class="flex items-center justify-center gap-2 h-[34px]">
+                                            <a :href="activeProperty.llcLink" target="_blank" x-show="activeProperty.llcLink" class="bg-green-800 text-white px-3 py-1 rounded text-sm font-medium hover:bg-green-900">LLC</a>
+                                            <span x-show="!activeProperty.llcLink" class="text-sm text-gray-400 italic">No Link</span>
+                                            <button @click="isEditingLink = true; $nextTick(() => $refs.llcInput.focus())" title="Add/Change LLC Link" class="text-blue-500 hover:text-blue-700"><i class="fas fa-plus-circle"></i></button>
+                                        </div>
+                                        <div x-show="isEditingLink" class="flex items-center gap-1">
+                                            <input type="url" class="field-input" :class="getFieldColor(activeProperty.llcLink)" x-model="activeProperty.llcLink" placeholder="Paste URL" @keydown.enter.prevent="isEditingLink = false; autoSave()" @blur="isEditingLink = false; autoSave()" x-ref="llcInput">
+                                        </div>
+                                        <span class="field-label">LLC Link</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="!activeProperty">
+                        <div class="flex-grow flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed my-2">
+                            <div class="text-center text-gray-500 p-8">
+                                <i class="fas fa-city text-4xl mb-3"></i>
+                                <p class="font-medium">This owner has no properties.</p>
+                                <p class="text-sm">Click "Add Property" to assign one.</p>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="flex justify-between items-center mt-4 mb-2">
+                        <h3 class="text-blue-800 font-bold text-base">Owner Information</h3>
+                        <button @click="confirmDeleteOwner(activeOwner)" class="text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-100" title="Delete This Owner">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+
+                    <div class="border rounded p-2 mt-0 space-y-1">
+                        <div class="flex gap-2">
+                            <div class="flex-1 text-center relative">
+                                <button @click="showMarkerDropdown = !showMarkerDropdown" class="w-full field-input text-white flex items-center justify-between" :class="getMarkerClass(activeOwner.status, 'bg')">
+                                    <span x-text="activeOwner.status || 'N/A'"></span><i class="fas fa-chevron-down text-xs"></i>
+                                </button>
+                                <div x-show="showMarkerDropdown" @click.away="showMarkerDropdown = false" class="absolute top-full left-0 right-0 bg-white border rounded shadow-lg z-10 mt-1">
+                                    <template x-for="marker in markerOptions" :key="marker.value">
+                                        <div @click="activeOwner.status = marker.value; showMarkerDropdown = false; autoSave()" class="marker-option cursor-pointer hover:opacity-80" :class="marker.class" x-text="marker.value"></div>
+                                    </template>
+                                </div>
+                                <span class="field-label">Owner Status</span>
+                            </div>
+                            <div class="flex-1 text-center"><input type="date" class="field-input" :class="getFieldColor(activeOwner.lastSpoken)" x-model="activeOwner.lastSpoken" @blur="autoSave()"><span class="field-label">Last Spoken</span></div>
+                            <div class="flex-1 text-center"><input type="date" class="field-input" :class="getFieldColor(activeOwner.nextFollowUp)" x-model="activeOwner.nextFollowUp" @blur="autoSave()"><span class="field-label">Next Follow-Up</span></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="flex-1 text-center"><input placeholder="Owner Address" type="text" class="field-input" :class="getFieldColor(activeOwner.residentialAddress)" x-model="activeOwner.residentialAddress" @blur="autoSave()"><span class="field-label">Owner Address</span></div>
+                            <div class="flex-1 text-center"><input placeholder="Owner Email" type="email" class="field-input" :class="getFieldColor(activeOwner.email)" x-model="activeOwner.email" @blur="autoSave()"><span class="field-label">Owner Email</span></div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="font-bold text-sm">Phone Numbers</h3>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="cellOnlyCheck" class="h-4 w-4 rounded" x-model="activeOwner.callWithCellOnly" @change="autoSave()">
+                                        <label for="cellOnlyCheck" class="ml-2 text-sm font-medium">Call with cell only</label>
+                                    </div>
+                                    <button @click="addPhoneNumber()" class="bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs hover:bg-green-600">+</button>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <div class="grid grid-cols-12 gap-2 text-xs font-medium text-gray-600 px-2">
+                                    <div class="col-span-3">Label</div>
+                                    <div class="col-span-5">Number</div>
+                                    <div class="col-span-1 text-center">Call</div>
+                                    <div class="col-span-2 text-center">Spoken</div>
+                                    <div class="col-span-1"></div>
+                                </div>
+                                <template x-for="(phone, index) in activeOwner.phones" :key="index">
+                                    <div class="phone-row grid grid-cols-12 gap-2 items-center" :class="phone.worked ? 'phone-worked' : 'phone-unworked'">
+                                        <div class="col-span-3"><input type="text" placeholder="Main" class="w-full p-1 border-0 bg-transparent text-sm" x-model="phone.label" @blur="autoSave()"></div>
+                                        <div class="col-span-5"><input type="tel" placeholder="(555) 555-5555" class="w-full p-1 border-0 bg-transparent text-sm" x-model="phone.number" @blur="autoSave()"></div>
+                                        <div class="col-span-1 flex justify-center">
+                                            <a :href="'tel:' + formatPhoneNumberForTel(phone.number)" @click="logCall(phone.number)" class="text-green-600 hover:text-green-800 p-1" title="Call Number"><i class="fas fa-phone"></i></a>
+                                        </div>
+                                        <div class="col-span-2 flex justify-center"><input type="checkbox" x-model="phone.worked" @change="autoSave()" class="w-4 h-4 text-blue-600 rounded"></div>
+                                        <div class="col-span-1 flex justify-center"><button @click="removePhoneNumber(index)" class="text-red-500 hover:text-red-700 text-sm">×</button></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="mt-4 border-t pt-2">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="font-bold text-sm">Status Tags</h3>
+                                <button @click="showStatusDropdown = !showStatusDropdown" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">Add Tag</button>
+                            </div>
+                            <div x-show="showStatusDropdown" @click.away="showStatusDropdown = false" class="relative mb-2">
+                                <div class="absolute top-0 left-0 right-0 bg-white border rounded shadow-lg z-20 p-2">
+                                    <template x-for="status in availableStatusTags" :key="status">
+                                        <div @click="toggleStatusTag(status)" class="status-tag inline-block" :class="getStatusTagClass(status)" x-text="status"></div>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                <template x-for="tag in activeOwner.statusTags" :key="tag">
+                                    <span class="status-tag" :class="getStatusTagClass(tag)">
+                                        <span x-text="tag"></span>
+                                        <button @click="removeStatusTag(tag)" class="ml-1 text-xs font-bold leading-none align-middle">×</button>
+                                    </span>
+                                </template>
+                                <div x-show="!activeOwner.statusTags || activeOwner.statusTags.length === 0" class="text-gray-500 text-sm">No tags selected</div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <aside class="w-1/3 bg-white border-l flex flex-col">
+                    <div class="h-48 border-b flex-shrink-0" x-ref="map"></div>
+                    <div class="flex-1 flex flex-col p-3 overflow-y-hidden">
+                        <div class="flex items-center justify-between mb-3 flex-shrink-0">
+                            <div>
+                                <h2 class="text-lg font-bold text-blue-800">Log</h2>
+                                <p class="text-sm text-gray-600" x-text="activeOwner.name"></p>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm" @click="showLogModal=true">Log Call</button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto space-y-2">
+                            <template x-for="(log, index) in activeOwner.communicationLog" :key="log.id || (log.timestamp + index)">
+                                <div class="border-b border-gray-100 pb-2 group relative">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-sm font-medium text-blue-600" x-text="log.type"></span>
+                                        <span class="text-xs text-gray-500" x-text="formatDateTime(log.timestamp)"></span>
+                                    </div>
+                                    <div class="text-sm text-gray-700 whitespace-pre-wrap" x-text="log.notes"></div>
+                                    <button @click="openEditLogModal(log, index)" class="absolute top-0 right-0 bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity">Edit</button>
+                                </div>
+                            </template>
+                            <div x-show="!activeOwner.communicationLog || activeOwner.communicationLog.length === 0" class="text-center text-gray-500 text-sm py-4">No communication history</div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </template>
+        <template x-if="!activeOwner">
+             <div class="w-3/4 flex items-center justify-center bg-gray-50">
+                <div class="text-center text-gray-400">
+                    <i class="fas fa-user-plus text-6xl mb-4"></i>
+                    <h2 class="text-xl font-medium">Select an owner to get started</h2>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+<!-- MODALS -->
+<div x-show="showFilterModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div @click.away="showFilterModal=false" class="bg-white p-6 rounded-lg shadow-lg w-auto max-w-4xl relative">
+        <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-blue-800">Filter Properties</h2><button @click="showFilterModal=false" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+            <select x-model="filters.location" class="p-2 border rounded"><option value="">All Locations</option><template x-for="loc in locationOptions"><option :value="loc.value" x-text="loc.value"></option></template></select>
+            <select x-model="filters.city" class="p-2 border rounded"><option value="">All Cities</option><template x-for="c in filterOptions.cities"><option :value="c" x-text="c"></option></template></select>
+            <select x-model="filters.submarket" class="p-2 border rounded"><option value="">All Submarkets</option><template x-for="s in filterOptions.submarkets"><option :value="s" x-text="s"></option></template></select>
+            <select x-model="filters.zip" class="p-2 border rounded"><option value="">All ZIPs</option><template x-for="z in filterOptions.zips"><option :value="z" x-text="z"></option></template></select>
+            <div><label class="block text-sm mb-1">Year Built</label><div class="flex gap-2"><input type="number" x-model.number="filters.yearMin" placeholder="Min" class="w-1/2 p-2 border rounded"><input type="number" x-model.number="filters.yearMax" placeholder="Max" class="w-1/2 p-2 border rounded"></div></div>
+            <div><label class="block text-sm mb-1">Unit Count</label><div class="flex gap-2"><input type="number" x-model.number="filters.unitMin" placeholder="Min" class="w-1/2 p-2 border rounded"><input type="number" x-model.number="filters.unitMax" placeholder="Max" class="w-1/2 p-2 border rounded"></div></div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Owner Status</label>
+                <div class="flex justify-start items-center my-2 space-x-4">
+                    <button @click="filters.selectedOwnerStatuses = markerOptions.map(o => o.value)" class="text-xs text-blue-600 hover:underline font-semibold">Select All</button>
+                    <button @click="filters.selectedOwnerStatuses = []" class="text-xs text-blue-600 hover:underline font-semibold">Deselect All</button>
+                </div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 max-h-48 overflow-y-auto border p-2 rounded">
+                    <template x-for="marker in markerOptions" :key="marker.value">
+                        <label class="flex items-center space-x-2 font-normal text-gray-700">
+                            <input type="checkbox" :value="marker.value" x-model="filters.selectedOwnerStatuses" class="rounded text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm" x-text="marker.value"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Owner Status Tags</label>
+                <div class="flex justify-start items-center my-2 space-x-4">
+                    <button @click="filters.selectedOwnerStatusTags = [...availableStatusTags]" class="text-xs text-blue-600 hover:underline font-semibold">Select All</button>
+                    <button @click="filters.selectedOwnerStatusTags = []" class="text-xs text-blue-600 hover:underline font-semibold">Deselect All</button>
+                </div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 max-h-48 overflow-y-auto border p-2 rounded">
+                    <label class="flex items-center space-x-2 font-normal text-gray-700">
+                        <input type="checkbox" x-model="filters.selectedBlank" class="rounded text-blue-600 focus:ring-blue-500">
+                        <span class="text-sm font-semibold italic">Blank</span>
+                    </label>
+                    <template x-for="tag in availableStatusTags" :key="tag">
+                        <label class="flex items-center space-x-2 font-normal text-gray-700">
+                            <input type="checkbox" :value="tag" x-model="filters.selectedOwnerStatusTags" class="rounded text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm" x-text="tag"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+            <button @click="resetFilters()" class="bg-gray-500 text-white px-4 py-2 rounded">Reset</button>
+            <button @click="showFilterModal=false" class="bg-orange-500 text-white px-4 py-2 rounded">Apply Filters</button>
+        </div>
+    </div>
+</div>
+
+<div x-show="showAddOwnerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-blue-800">Add Owner</h2><button @click="showAddOwnerModal=false" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div>
+        <form @submit.prevent="addOwner()">
+            <label class="block text-sm font-medium mb-1">Owner Name *</label><input type="text" x-model="addOwnerForm.name" class="w-full border rounded p-2 mb-3" required>
+            <label class="block text-sm font-medium mb-1">Email</label><input type="email" x-model="addOwnerForm.email" class="w-full border rounded p-2 mb-3">
+            <label class="block text-sm font-medium mb-1">Address</label><input type="text" x-model="addOwnerForm.residentialAddress" class="w-full border rounded p-2 mb-3">
+            <label class="block text-sm font-medium mb-1">Phone Number</label><input type="tel" x-model="addOwnerForm.phone" class="w-full border rounded p-2 mb-4">
+            <div class="flex justify-end gap-2"><button type="button" class="bg-gray-500 text-white px-4 py-2 rounded" @click="showAddOwnerModal=false">Cancel</button><button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Add Owner</button></div>
+        </form>
+    </div>
+</div>
+
+<div x-show="showAddPropertyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto relative">
+        <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-blue-800">Add Property</h2><button @click="showAddPropertyModal=false" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div>
+        <form @submit.prevent="addProperty()">
+            <div class="mb-3">
+                <label class="block text-sm font-medium mb-1">Assign to Owner *</label>
+                <div class="relative">
+                    <input type="text" x-model="ownerSearchQuery" @input="filterOwnerOptions()" @focus="showOwnerDropdown = true" placeholder="Search owners..." class="w-full p-2 border rounded">
+                    <div x-show="showOwnerDropdown && filteredOwnerOptions.length > 0" @click.away="showOwnerDropdown = false" class="absolute top-full left-0 right-0 bg-white border rounded shadow-lg z-10 max-h-40 overflow-y-auto">
+                        <template x-for="owner in filteredOwnerOptions"><div @click="selectOwnerForProperty(owner)" class="p-2 hover:bg-gray-100 cursor-pointer text-sm" x-text="owner.name"></div></template>
+                    </div>
+                </div>
+                <div x-show="addPropertyForm.selectedOwner" class="mt-1 text-sm text-green-600">Selected: <span x-text="addPropertyForm.selectedOwner?.name"></span></div>
+            </div>
+            <label class="block text-sm font-medium mb-1">Address *</label><input type="text" x-model="addPropertyForm.address" class="w-full border rounded p-2 mb-2" required>
+            <label class="block text-sm font-medium mb-1">Costar #</label><input type="text" x-model="addPropertyForm.costarNumber" class="w-full border rounded p-2 mb-2">
+            <div class="flex justify-end gap-2"><button type="button" class="bg-gray-500 text-white px-4 py-2 rounded" @click="showAddPropertyModal=false">Cancel</button><button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded" :disabled="!addPropertyForm.selectedOwner">Add Property</button></div>
+        </form>
+    </div>
+</div>
+
+<div x-show="showLogModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-lg font-bold text-blue-800 mb-4">Log Communication</h2>
+        <form @submit.prevent="saveLog()">
+            <div class="mb-4">
+                <label class="block text-sm font-medium">Type</label>
+                <select x-model="newLog.type" class="w-full p-2 border rounded">
+                    <option>Call</option><option>Text</option><option>Email</option><option>Meeting</option><option>Letter</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Templates</label>
+                <div class="bg-gray-50 p-2 rounded border">
+                    <div class="flex flex-wrap gap-1">
+                        <template x-for="template in logTemplates" :key="template.id">
+                            <span @click="applyLogTemplate(template)" class="template-tag">
+                                <span x-text="template.text"></span>
+                                <button @click.stop.prevent="deleteLogTemplate(template.id)" class="template-tag-delete">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+                    <div class="flex items-center mt-2 gap-2">
+                        <input type="text" x-model="newTemplateText" @keydown.enter.prevent="addNewTemplate()" placeholder="Create new template..." class="flex-grow p-1 border rounded text-sm">
+                        <select x-model="newTemplateType" class="p-1 border rounded text-sm">
+                            <option>Call</option><option>Text</option><option>Email</option><option>Meeting</option><option>Letter</option>
+                        </select>
+                        <button @click.prevent="addNewTemplate()" class="bg-gray-200 text-gray-700 px-3 py-1 text-sm rounded hover:bg-gray-300">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium">Conversation Notes</label>
+                <textarea x-model="newLog.notes" class="w-full p-2 border rounded" rows="4" placeholder="Enter details..."></textarea>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium">Next Follow-Up Date</label>
+                <input type="date" x-model="newLog.followUp" class="w-full p-2 border rounded">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded" @click="showLogModal=false">Cancel</button>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded" :disabled="!newLog.notes.trim()">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div x-show="showEditLogModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-lg font-bold text-blue-800 mb-4">Edit Log Entry</h2>
+        <template x-if="editingLog">
+            <form @submit.prevent="saveEditedLog()">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium">Log Date & Time</label>
+                    <input type="datetime-local" x-model="editingLog.timestamp" class="w-full p-2 border rounded">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium">Conversation Notes</label>
+                    <textarea x-model="editingLog.notes" class="w-full p-2 border rounded" rows="6" placeholder="Enter details..."></textarea>
+                </div>
+                <div class="flex justify-between items-center">
+                    <button type="button" class="text-red-600 hover:text-red-800 text-sm" @click="confirmDeleteLogEntry()">Delete Entry</button>
+                    <div class="flex gap-2">
+                        <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded" @click="closeEditLogModal()">Cancel</button>
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded" :disabled="!editingLog.notes.trim()">Save Changes</button>
+                    </div>
+                </div>
+            </form>
+        </template>
+    </div>
+</div>
+
+<div x-show="showImageModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50" x-cloak>
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-lg font-bold text-blue-800 mb-4">Update Image</h2>
+        <label class="block mb-1 text-sm">Image URL</label><input type="url" class="w-full border rounded p-2 mb-4" x-model="newImageUrl" placeholder="https://example.com/image.jpg">
+        <label class="block mb-1 text-sm">Or Upload File</label><input type="file" @change="handleFileUpload($event)" accept="image/*" class="w-full mb-4">
+        <div class="flex justify-end gap-2"><button @click="closeImageModal()" class="bg-gray-300 px-3 py-1 rounded">Cancel</button><button @click="addImage()" class="bg-blue-600 text-white px-3 py-1 rounded" :disabled="!newImageUrl">Add</button></div>
+    </div>
+</div>
+
+<div x-show="showDeleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-lg font-bold text-red-600 mb-4">Confirm Action</h2>
+        <p class="text-gray-700 mb-6" x-text="deleteConfirmMessage"></p>
+        <div class="flex justify-end gap-2">
+            <button @click="cancelDelete()" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+            <button @click="executeDeleteAction()" class="bg-red-500 text-white px-4 py-2 rounded">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<div x-show="showChangeOwnerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div @click.away="closeChangeOwnerModal()" class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-lg font-bold text-blue-800 mb-4">Change Property Owner</h2>
+        <p class="text-sm mb-1">Property: <strong x-text="activeProperty?.address"></strong></p>
+        <p class="text-sm mb-4">Current Owner: <strong x-text="activeOwner?.name"></strong></p>
+        <div class="mb-3">
+            <label class="block text-sm font-medium mb-1">Search for New Owner *</label>
+            <div class="relative">
+                <input type="text" x-model="changeOwnerSearchQuery" @input="filterChangeOwnerOptions()" placeholder="Search owners..." class="w-full p-2 border rounded" @focus="showChangeOwnerDropdown = true">
+                <div x-show="showChangeOwnerDropdown && filteredChangeOwnerOptions.length > 0" @click.away="showChangeOwnerDropdown = false" class="absolute top-full left-0 right-0 bg-white border rounded shadow-lg z-10 max-h-40 overflow-y-auto">
+                    <template x-for="owner in filteredChangeOwnerOptions"><div @click="selectNewOwner(owner)" class="p-2 hover:bg-gray-100 cursor-pointer text-sm" x-text="owner.name"></div></template>
+                </div>
+            </div>
+            <div x-show="newOwnerSelection" class="mt-1 text-sm text-green-600">Selected: <span x-text="newOwnerSelection?.name"></span></div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+            <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded" @click="closeChangeOwnerModal()">Cancel</button>
+            <button type="button" @click="executeChangeOwner()" class="bg-orange-500 text-white px-4 py-2 rounded" :disabled="!newOwnerSelection">Confirm Change</button>
+        </div>
+    </div>
+</div>
+
+<div x-show="showStatusBreakdownModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div @click.away="showStatusBreakdownModal = false" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+        <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-blue-800">Status Breakdown</h2><button @click="showStatusBreakdownModal = false" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div>
+        <div class="flex flex-col md:flex-row gap-6 items-center">
+            <div class="w-full md:w-1/2 h-64 flex items-center justify-center"><canvas x-ref="statusChartCanvas"></canvas></div>
+            <div class="w-full md:w-1/2">
+                <div class="font-bold text-sm mb-2 text-gray-600">Total Owners: <span x-text="statusBreakdownData.total"></span></div>
+                <template x-for="item in statusBreakdownData.detailed" :key="item.label">
+                    <div class="flex justify-between items-center text-sm py-1.5 border-b">
+                        <div class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" :style="{ backgroundColor: item.color }"></span><span x-text="item.label"></span></div>
+                        <div class="font-semibold"><span x-text="item.count"></span> <span class="text-gray-500">(<span x-text="item.percentage"></span>%)</span></div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Call Tracker Modal -->
+<div x-show="showCallTrackerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div @click.away="showCallTrackerModal=false" class="bg-white p-6 rounded-lg shadow-xl w-full max-w-2xl">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-800">Call Tracker</h2>
+            <button @click="showCallTrackerModal=false" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+        </div>
+        <template x-if="callTrackerData">
+            <div>
+                <div class="text-center mb-4">
+                    <p class="text-lg font-semibold text-gray-700">Calls Today: <span class="text-orange-500" x-text="callTrackerData.todayCalls"></span></p>
+                </div>
+                <div class="bg-gray-100 p-2 rounded-md mb-4 flex justify-center items-center gap-4">
+                    <span class="text-sm font-medium">View:</span>
+                    <button @click="callTrackerView = 'weekly'; renderCallChart()" :class="callTrackerView === 'weekly' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600'" class="px-3 py-1 text-sm rounded-md shadow-sm">Weekly</button>
+                    <button @click="callTrackerView = 'monthly'; renderCallChart()" :class="callTrackerView === 'monthly' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600'" class="px-3 py-1 text-sm rounded-md shadow-sm">Monthly</button>
+                </div>
+                <div class="h-64 mb-4">
+                    <canvas x-ref="callChartCanvas"></canvas>
+                </div>
+                <div class="grid grid-cols-2 gap-4 text-center border-t pt-4">
+                    <div>
+                        <p class="text-sm text-gray-500">Average Calls for the Week</p>
+                        <p class="text-xl font-bold text-gray-800" x-text="callTrackerData.weekAvg"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Average Calls for the Month</p>
+                        <p class="text-xl font-bold text-gray-800" x-text="callTrackerData.monthAvg"></p>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <template x-if="!callTrackerData">
+            <div class="text-center p-8">
+                <div class="loader mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading call data...</p>
+            </div>
+        </template>
+    </div>
+</div>
+
+<!-- Celebratory Popup -->
+<div x-show="showCelebrationModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]" x-cloak>
+    <div class="bg-yellow-300 text-orange-600 p-8 rounded-xl shadow-2xl text-center transform transition-all"
+        x-show="showCelebrationModal"
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0 scale-90"
+        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-90">
+        <h2 class="text-3xl font-bold mb-4">Woo hoo!</h2>
+        <p class="text-xl mb-6">50 calls today, great work!</p>
+        <button @click="showCelebrationModal = false" class="bg-orange-500 text-white font-bold px-6 py-2 rounded-full hover:bg-orange-600 transition">Let's Go</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('crm', () => ({
+        // --- STATE ---
+        allOwners: [],
+        filterOptions: { cities: [], zips: [], submarkets: [], locations: [] },
+        activeOwnerId: null,
+        activePropertyIndex: 0,
+        searchQuery: '',
+        taskFilter: 'today',
+        currentDate: new Date().toISOString().split('T')[0],
+        newDateFilter: new Date().toISOString().split('T')[0],
+
+        // --- UI/MODAL STATE ---
+        isLoading: true,
+        loadingMessage: 'Loading CRM data...',
+        showFilterModal: false,
+        showAddOwnerModal: false,
+        showAddPropertyModal: false,
+        showLogModal: false,
+        showImageModal: false,
+        showMarkerDropdown: false,
+        showStatusDropdown: false,
+        showOwnerDropdown: false,
+        showDeleteConfirmModal: false,
+        showStatusBreakdownModal: false,
+        showEditLogModal: false,
+        showChangeOwnerModal: false,
+        showGlobalSearchDropdown: false,
+        showCallTrackerModal: false,
+        showCelebrationModal: false,
+        hasCelebratedToday: false,
+        isAddingProperty: false,
+        propertyBeingAddedAddress: null,
+        addPropertyStatusMessage: '',
+
+        // --- FORMS & HELPERS ---
+        filters: { city: '', zip: '', submarket: '', yearMin: null, yearMax: null, unitMin: null, unitMax: null, location: '', selectedOwnerStatusTags: [], selectedBlank: false, selectedOwnerStatuses: [] },
+        addOwnerForm: { name: '', email: '', residentialAddress: '', phone: '' },
+        addPropertyForm: { selectedOwner: null, address: '', costarNumber: '' },
+        newLog: { type: 'Call', notes: '', followUp: '' },
+        editingLog: null,
+        editingLogIndex: null,
+        ownerSearchQuery: '',
+        filteredOwnerOptions: [],
+        newImageUrl: '',
+        editingImageIndex: null,
+        deleteConfirmMessage: '',
+        deleteConfirmAction: null,
+        changeOwnerSearchQuery: '',
+        filteredChangeOwnerOptions: [],
+        showChangeOwnerDropdown: false,
+        newOwnerSelection: null,
+        globalSearchQuery: '',
+        globalSearchResults: [],
+        globalSearchHighlightIndex: -1,
+        isEditingOwnerName: false,
+        editingOwnerNameValue: '',
+        callTrackerData: null,
+        callChart: null,
+        callTrackerView: 'weekly',
+        logTemplates: [],
+        newTemplateText: '',
+        newTemplateType: 'Call',
+
+        // --- CONSTANTS ---
+        availableStatusTags: ['Buyer', 'Seller', 'Meeting', 'Proposal', '1031', 'Talker', '6 Months Seller', 'Market Updates', 'Developer', 'IPA', 'Email', 'Never call', 'Rex St', 'Ftn Blue', 'Tabor/Water'],
+        markerOptions: [
+            { value: 'IPA', class: 'marker-ipa' }, { value: 'Spoken To', class: 'marker-spoken' }, { value: 'Listed', class: 'marker-listed' },
+            { value: 'WR / ND', class: 'marker-wr' }, { value: 'Never Spoken', class: 'marker-never' }, { value: 'Condo/Religious', class: 'marker-condo' },
+            { value: 'Broker', class: 'marker-broker' }, { value: 'TCG', class: 'marker-tcg' }
+        ],
+        locationOptions: [
+            { value: 'Far Out SE', class: 'location-far-out-se' }, { value: 'SE Portland', class: 'location-se-portland' },
+            { value: 'NW Portland', class: 'location-nw-portland' }, { value: 'N Portland', class: 'location-n-portland' },
+            { value: 'NW / Downtown Portland', class: 'location-nw-downtown-portland' }, { value: 'Corvallis', class: 'location-corvallis' },
+            { value: 'Eugene / Springfield', class: 'location-eugene-springfield' },
+        ],
+        
+        // --- INITIALIZATION ---
+        async init() {
+            this.loadingMessage = 'Loading CRM data...';
+            this.isLoading = true;
+            this.filters.selectedOwnerStatusTags = [...this.availableStatusTags];
+            this.filters.selectedOwnerStatuses = this.markerOptions.map(m => m.value);
+
+            try {
+                const { data: ownersData, error: ownersError } = await supabase
+                    .from('owners')
+                    .select('*, properties(*), communication_logs(*)');
+
+                if (ownersError) throw ownersError;
+
+                const transformedOwners = ownersData.map(owner => {
+                    const uiOwner = {
+                        id: owner.id,
+                        name: owner.owner_name,
+                        email: owner.owner_email,
+                        residentialAddress: owner.owner_address,
+                        status: owner.marker_pin,
+                        statusTags: owner.status_tags ? owner.status_tags.split(',').map(t => t.trim()) : [],
+                        lastSpoken: owner.last_spoken,
+                        nextFollowUp: owner.next_follow_up,
+                        callWithCellOnly: owner.call_with_cell_only,
+                        properties: (owner.properties || []).map(p => ({
+                            id: p.id,
+                            ownerId: p.owner_id,
+                            images: [p.image_url_1, p.image_url_2].filter(Boolean),
+                            address: p.address,
+                            propertyName: p.property_name,
+                            city: p.city,
+                            state: p.state,
+                            zip: p.zip,
+                            yearBuilt: p.built,
+                            submarket: p.submarket,
+                            units: p.units,
+                            parcelNumber: p.parcel_number,
+                            costarNumber: p.costar_number,
+                            longitude: p.long,
+                            latitude: p.latt,
+                            coStarLink: p.costar_link,
+                            tpsLink: p.tps_link,
+                            llcLink: p.llc_link,
+                            location: p.location,
+                        })),
+                        communicationLog: (owner.communication_logs || []).map(l => ({
+                            id: l.id,
+                            ownerId: l.owner_id,
+                            timestamp: l.date,
+                            type: l.type,
+                            notes: l.notes,
+                        })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
+                        phones: [],
+                    };
+
+                    for (let i = 1; i <= 5; i++) {
+                        if (owner[`phone_number_${i}`]) {
+                            uiOwner.phones.push({
+                                label: owner[`phone_label_${i}`] || '',
+                                number: owner[`phone_number_${i}`] || '',
+                                worked: owner[`spoken_${i}`] || false,
+                            });
+                        }
+                    }
+                    return uiOwner;
+                });
+
+                this.allOwners = transformedOwners;
+                
+                const cities = new Set(), zips = new Set(), submarkets = new Set(), locations = new Set();
+                this.allOwners.forEach(owner => {
+                    (owner.properties || []).forEach(prop => {
+                        if (prop.city) cities.add(prop.city);
+                        if (prop.zip) zips.add(prop.zip);
+                        if (prop.submarket) submarkets.add(prop.submarket);
+                        if (prop.location) locations.add(prop.location);
+                    });
+                });
+                this.filterOptions.cities = [...cities].sort();
+                this.filterOptions.zips = [...zips].sort();
+                this.filterOptions.submarkets = [...submarkets].sort();
+                this.filterOptions.locations = [...locations].sort();
+
+                if (this.allOwners.length > 0) {
+                    this.selectOwner(this.allOwners[0].id);
+                }
+            } catch (error) {
+                this.loadingMessage = `Fatal Error: ${error.message}`;
+                alert(`Could not load data from the database: ${error.message}`);
+            } finally {
+                this.isLoading = false;
+            }
+            
+            this.$watch('activeOwnerId', id => { this.activePropertyIndex = 0; if (id) this.$nextTick(() => this.initializeOrUpdateMap()); });
+            this.$watch('activePropertyIndex', () => this.$nextTick(() => this.initializeOrUpdateMap()));
+        },
+
+        // --- DATA SYNC ---
+        async autoSave() {
+            console.log("Saving in background...");
+            if (!this.activeOwner) return;
+
+            try {
+                const ownerToSave = this.allOwners.find(o => o.id === this.activeOwnerId);
+                if (!ownerToSave) {
+                    console.error("Cannot save: Active owner not found.");
+                    return;
+                }
+
+                const ownerPayload = {
+                    id: ownerToSave.id,
+                    owner_name: ownerToSave.name,
+                    owner_email: ownerToSave.email,
+                    owner_address: ownerToSave.residentialAddress,
+                    marker_pin: ownerToSave.status,
+                    status_tags: ownerToSave.statusTags ? ownerToSave.statusTags.join(',') : null,
+                    last_spoken: ownerToSave.lastSpoken || null,
+                    next_follow_up: ownerToSave.nextFollowUp || null,
+                    call_with_cell_only: ownerToSave.callWithCellOnly,
+                };
+
+                for (let i = 0; i < 5; i++) {
+                    const phone = ownerToSave.phones[i];
+                    ownerPayload[`phone_label_${i+1}`] = phone ? phone.label : null;
+                    ownerPayload[`phone_number_${i+1}`] = phone ? phone.number : null;
+                    ownerPayload[`spoken_${i+1}`] = phone ? phone.worked : false;
+                }
+                
+                const { error: ownerError } = await supabase.from('owners').upsert(ownerPayload);
+                if (ownerError) throw ownerError;
+
+                if (ownerToSave.properties && ownerToSave.properties.length > 0) {
+                    const propertiesPayload = ownerToSave.properties.map(prop => ({
+                        id: prop.id,
+                        owner_id: ownerToSave.id,
+                        address: prop.address,
+                        property_name: prop.propertyName,
+                        city: prop.city,
+                        state: prop.state,
+                        zip: prop.zip,
+                        built: prop.yearBuilt ? parseInt(prop.yearBuilt, 10) : null,
+                        submarket: prop.submarket,
+                        units: prop.units ? parseInt(prop.units, 10) : null,
+                        parcel_number: prop.parcelNumber,
+                        costar_number: prop.costarNumber,
+                        long: prop.longitude ? parseFloat(prop.longitude) : null,
+                        latt: prop.latitude ? parseFloat(prop.latitude) : null,
+                        costar_link: prop.coStarLink,
+                        tps_link: prop.tpsLink,
+                        llc_link: prop.llcLink,
+                        location: prop.location,
+                        image_url_1: prop.images ? prop.images[0] : null,
+                        image_url_2: prop.images ? prop.images[1] : null,
+                    }));
+                    const { error: propError } = await supabase.from('properties').upsert(propertiesPayload);
+                    if (propError) throw propError;
+                }
+                console.log('Save successful');
+            } catch (error) {
+                console.error("Save failed:", error);
+                alert(`SAVE FAILED: ${error.message}\n\nThis may be caused by a browser extension (like an ad blocker) blocking requests to Supabase. Please check your browser extensions and console for network errors.`);
+            }
+        },
+
+        // --- COMPUTED PROPERTIES ---
+        isMatch(owner) {
+            const term = this.searchQuery.trim().toLowerCase();
+            if (!term) return false;
+            return (owner.name && owner.name.toLowerCase().includes(term)) ||
+                   (owner.email && owner.email.toLowerCase().includes(term)) ||
+                   ((owner.properties || []).some(p => (p.address && p.address.toLowerCase().includes(term)) || (p.costarNumber && p.costarNumber.toLowerCase().includes(term)))) ||
+                   ((owner.phones || []).some(p => p.number && p.number.includes(term))) ||
+                   ((owner.statusTags || []).some(t => t.toLowerCase().includes(term)));
+        },
+        get hardFilteredOwners() {
+            return this.allOwners.filter(owner => {
+                const markerOptionsCount = this.markerOptions.length;
+                const availableStatusTagsCount = this.availableStatusTags.length;
+                const selectedStatuses = this.filters.selectedOwnerStatuses;
+                if (selectedStatuses.length < markerOptionsCount) {
+                    if (!owner.status || !selectedStatuses.includes(owner.status)) return false;
+                }
+                const selectedRealTags = this.filters.selectedOwnerStatusTags;
+                const blankSelected = this.filters.selectedBlank;
+                if (selectedRealTags.length < availableStatusTagsCount || blankSelected) {
+                    const ownerTags = owner.statusTags || [];
+                    const hasMatchingRealTag = ownerTags.some(tag => selectedRealTags.includes(tag));
+                    const isBlankAndMatches = blankSelected && ownerTags.length === 0;
+                    if (!hasMatchingRealTag && !isBlankAndMatches) return false;
+                }
+                const isPropertyFilterActive = this.filters.city || this.filters.zip || this.filters.submarket || this.filters.location || this.filters.yearMin || this.filters.yearMax || this.filters.unitMin || this.filters.unitMax;
+                if (!isPropertyFilterActive) return true;
+                
+                return (owner.properties || []).some(p => {
+                    const cityMatch = !this.filters.city || p.city === this.filters.city;
+                    const zipMatch = !this.filters.zip || p.zip === this.filters.zip;
+                    const submarketMatch = !this.filters.submarket || p.submarket === this.filters.submarket;
+                    const locationMatch = !this.filters.location || p.location === this.filters.location;
+                    const yearMinMatch = !this.filters.yearMin || (p.yearBuilt && p.yearBuilt >= this.filters.yearMin);
+                    const yearMaxMatch = !this.filters.yearMax || (p.yearBuilt && p.yearBuilt <= this.filters.yearMax);
+                    const unitMinMatch = !this.filters.unitMin || (p.units && p.units >= this.filters.unitMin);
+                    const unitMaxMatch = !this.filters.unitMax || (p.units && p.units <= this.filters.unitMax);
+                    return cityMatch && zipMatch && submarketMatch && locationMatch && yearMinMatch && yearMaxMatch && unitMinMatch && unitMaxMatch;
+                });
+            });
+        },
+        get softSortedOwners() {
+            const term = this.searchQuery.trim().toLowerCase();
+            let ownersToShow = this.hardFilteredOwners;
+            if (!term) return ownersToShow.slice().sort((a, b) => a.name.localeCompare(b.name));
+            return ownersToShow.slice().sort((a, b) => {
+                const aIsMatch = this.isMatch(a);
+                const bIsMatch = this.isMatch(b);
+                if (aIsMatch && !bIsMatch) return -1;
+                if (!aIsMatch && bIsMatch) return 1;
+                return a.name.localeCompare(b.name);
+            });
+        },
+        get activeOwner() { return this.allOwners.find(o => o.id === this.activeOwnerId) || null; },
+        get activeProperty() { 
+            if (!this.activeOwner || !this.activeOwner.properties || this.activeOwner.properties.length === 0) return null; 
+            if(this.activePropertyIndex >= this.activeOwner.properties.length) { this.activePropertyIndex = 0; }
+            return this.activeOwner.properties[this.activePropertyIndex]; 
+        },
+        get allFollowUpTasks() {
+            const tasks = [];
+            this.allOwners.forEach(owner => {
+                if (owner.nextFollowUp) {
+                    const dueDate = new Date(owner.nextFollowUp + 'T00:00:00');
+                    const today = new Date(this.currentDate + 'T00:00:00');
+                    let status = 'future';
+                    if (dueDate < today) status = 'overdue';
+                    else if (dueDate.getTime() === today.getTime()) status = 'today';
+                    tasks.push({ ownerId: owner.id, ownerName: owner.name, propertyCount: (owner.properties || []).length, dueDate: owner.nextFollowUp, status: status });
+                }
+            });
+            return tasks.sort((a,b) => new Date(a.dueDate) - new Date(b.dueDate));
+        },
+        get filteredFollowUpTasks() {
+            let tasks = this.allFollowUpTasks;
+            if (this.taskFilter === 'today') return tasks.filter(t => t.status === 'today');
+            if (this.taskFilter === 'overdue') return tasks.filter(t => t.status === 'overdue');
+            return tasks;
+        },
+        get overdueTasksCount() { return this.allFollowUpTasks.filter(t => t.status === 'overdue').length; },
+        get statusBreakdownData() {
+            const counts = {};
+            this.allOwners.forEach(o => { const status = o.status || 'N/A'; counts[status] = (counts[status] || 0) + 1; });
+            const total = this.allOwners.length;
+            const colors = { 'Spoken To': '#10b981', 'IPA': '#1f2937', 'Listed': '#f59e0b', 'WR / ND': '#eab308', 'Never Spoken': '#3b82f6', 'Condo/Religious': '#ec4899', 'Broker': '#8b5cf6', 'TCG': '#1f2937' };
+            const sorted = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+            return { labels: sorted, counts: sorted.map(l => counts[l]), colors: sorted.map(l => colors[l] || '#9ca3af'), detailed: sorted.map(l => ({ label: l, count: counts[l], percentage: total > 0 ? ((counts[l]/total)*100).toFixed(1) : 0, color: colors[l] || '#9ca3af' })), total: total, };
+        },
+
+        // --- METHODS ---
+        startEditOwnerName() {
+            if (!this.activeOwner) return;
+            this.editingOwnerNameValue = this.activeOwner.name;
+            this.isEditingOwnerName = true;
+            this.$nextTick(() => this.$refs.ownerNameInput.focus());
+        },
+        cancelEditOwnerName() {
+            this.isEditingOwnerName = false;
+            this.editingOwnerNameValue = '';
+        },
+        async saveOwnerName() {
+            const ownerId = this.activeOwner.id;
+            const oldName = this.activeOwner.name;
+            const newName = this.editingOwnerNameValue.trim();
+            if (!newName) { alert('Owner name cannot be empty.'); return; }
+            if (newName === oldName) { this.cancelEditOwnerName(); return; }
+            if (this.allOwners.some(o => o.name.toLowerCase() === newName.toLowerCase() && o.id !== ownerId)) {
+                alert(`An owner with the name "${newName}" already exists.`);
+                return;
+            }
+            this.isLoading = true;
+            this.loadingMessage = `Updating owner name...`;
+
+            try {
+                const { error } = await supabase.from('owners').update({ owner_name: newName }).eq('id', ownerId);
+                if (error) throw error;
+                
+                const ownerIndex = this.allOwners.findIndex(o => o.id === ownerId);
+                if (ownerIndex > -1) {
+                    this.allOwners[ownerIndex].name = newName;
+                    this.allOwners[ownerIndex].communicationLog.forEach(log => { log.ownerName = newName; });
+                }
+                
+                console.log('Owner name updated successfully.');
+            } catch(error) {
+                alert(`Failed to update owner name: ${error.message}`);
+            } finally {
+                this.isLoading = false;
+                this.cancelEditOwnerName();
+            }
+        },
+        updateGlobalSearch() {
+            if (this.globalSearchQuery.length < 2) { this.globalSearchResults = []; this.showGlobalSearchDropdown = false; return; }
+            const term = this.globalSearchQuery.toLowerCase();
+            const results = [];
+            const addedOwnerIds = new Set();
+            this.allOwners.forEach(owner => {
+                if (owner.name.toLowerCase().includes(term) && !addedOwnerIds.has(owner.id)) {
+                    results.push({ key: `owner-${owner.id}`, type: 'owner', ownerId: owner.id, propertyId: null, name: owner.name, context: `Owner`});
+                    addedOwnerIds.add(owner.id);
+                }
+                (owner.properties || []).forEach(prop => {
+                    if (prop.address && prop.address.toLowerCase().includes(term)) {
+                        results.push({ key: `prop-${prop.id}`, type: 'property', ownerId: owner.id, propertyId: prop.id, name: prop.address, context: `Property of: ${owner.name}`});
+                    }
+                });
+            });
+            this.globalSearchResults = results.slice(0, 15);
+            this.showGlobalSearchDropdown = true;
+            this.globalSearchHighlightIndex = -1;
+        },
+        hideGlobalSearchDropdown() { setTimeout(() => { this.showGlobalSearchDropdown = false; this.globalSearchHighlightIndex = -1; }, 200); },
+        navigateGlobalSearch(direction) {
+            if (!this.showGlobalSearchDropdown || this.globalSearchResults.length === 0) return;
+            const maxIndex = this.globalSearchResults.length - 1;
+            let newIndex = this.globalSearchHighlightIndex + direction;
+            if (newIndex < 0) newIndex = maxIndex;
+            else if (newIndex > maxIndex) newIndex = 0;
+            this.globalSearchHighlightIndex = newIndex;
+        },
+        selectHighlightedGlobalResult() {
+            if (this.showGlobalSearchDropdown && this.globalSearchHighlightIndex > -1) {
+                this.selectGlobalResult(this.globalSearchResults[this.globalSearchHighlightIndex]);
+            } else if (this.globalSearchResults.length > 0) {
+                this.selectGlobalResult(this.globalSearchResults[0]);
+            }
+        },
+        selectGlobalResult(result) {
+            if (!result) return;
+            this.selectOwner(result.ownerId);
+            if (result.type === 'property') {
+                const owner = this.allOwners.find(o => o.id === result.ownerId);
+                if (owner && owner.properties) {
+                    const propIndex = owner.properties.findIndex(p => p.id === result.propertyId);
+                    if (propIndex > -1) { this.activePropertyIndex = propIndex; }
+                }
+            }
+            this.$nextTick(() => {
+                const el = this.$refs.ownerListContainer.querySelector(`#owner-item-${result.ownerId}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+            this.globalSearchQuery = result.name;
+            this.showGlobalSearchDropdown = false;
+        },
+        async saveLog() {
+            if (!this.activeOwner || !this.newLog.notes.trim()) return;
+            
+            const now = new Date();
+            const timestamp = now.toISOString();
+            const lastSpokenDate = now.toISOString().split('T')[0];
+
+            const logEntry = { owner_id: this.activeOwner.id, date: timestamp, type: this.newLog.type, notes: this.newLog.notes };
+
+            try {
+                const { data, error } = await supabase.from('communication_logs').insert(logEntry).select().single();
+                if (error) throw error;
+
+                if (!this.activeOwner.communicationLog) this.activeOwner.communicationLog = [];
+                this.activeOwner.communicationLog.unshift({ id: data.id, ownerId: data.owner_id, timestamp: data.date, type: data.type, notes: data.notes });
+
+                if (this.newLog.type === 'Call' || this.newLog.type === 'Meeting') {
+                    this.activeOwner.lastSpoken = lastSpokenDate;
+                }
+                if (this.newLog.followUp) {
+                    this.activeOwner.nextFollowUp = this.newLog.followUp;
+                }
+                
+                this.autoSave(); 
+                
+                this.showLogModal = false;
+                this.newLog = { type: 'Call', notes: '', followUp: '' };
+                console.log('Log saved successfully');
+            } catch (error) {
+                alert(`Failed to save log: ${error.message}`);
+            }
+        },
+        focusOnFirstMatch() {
+            const firstMatch = this.softSortedOwners.find(o => this.isMatch(o));
+            if (firstMatch) {
+                this.selectOwner(firstMatch.id);
+                this.$nextTick(() => {
+                    const el = this.$refs.ownerListContainer.querySelector(`#owner-item-${firstMatch.id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            } else if (this.searchQuery) {
+                alert('No match found in the current list.');
+            }
+        },
+        confirmDeleteLogEntry() { if (window.confirm('Are you sure you want to delete this log entry?')) { this.deleteLogEntry(); } },
+        async deleteLogEntry() {
+            if (this.editingLogIndex === null || !this.activeOwner.communicationLog[this.editingLogIndex]) return;
+            const logToDelete = this.activeOwner.communicationLog[this.editingLogIndex];
+            
+            try {
+                const { error } = await supabase.from('communication_logs').delete().eq('id', logToDelete.id);
+                if (error) throw error;
+                
+                this.activeOwner.communicationLog.splice(this.editingLogIndex, 1);
+                this.closeEditLogModal();
+            } catch (error) {
+                alert(`Failed to delete log: ${error.message}`);
+            }
+        },
+        initializeOrUpdateMap() {
+            if (!this.activeOwner) return;
+            if (!this.mapInitialized && this.$refs.map) {
+                this.map = L.map(this.$refs.map).setView([45.5, -122.67], 10);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
+                this.mapInitialized = true;
+            }
+            if (!this.map) return;
+            this.map.invalidateSize();
+            this.map.eachLayer(l => { if (l instanceof L.Marker) this.map.removeLayer(l); });
+            if (!this.activeProperty) { this.map.setView([45.5, -122.67], 10); return; }
+            (this.activeOwner.properties || []).forEach((p, i) => {
+                const lat = parseFloat(p.latitude);
+                const lon = parseFloat(p.longitude);
+                if (lat && lon) {
+                    const marker = L.marker([lat, lon]).addTo(this.map).bindPopup(`<strong>${p.propertyName || p.address}</strong>`);
+                    if (i === this.activePropertyIndex) marker.openPopup();
+                }
+            });
+            const currentLat = parseFloat(this.activeProperty.latitude);
+            const currentLon = parseFloat(this.activeProperty.longitude);
+            if (currentLat && currentLon) this.map.setView([currentLat, currentLon], 15);
+            else this.map.setView([45.5, -122.67], 10);
+        },
+        selectOwner(id) { this.activeOwnerId = id; },
+        nextProperty() { if (this.activeOwner?.properties.length > 1) this.activePropertyIndex = (this.activePropertyIndex + 1) % this.activeOwner.properties.length; },
+        previousProperty() { if (this.activeOwner?.properties.length > 1) this.activePropertyIndex = this.activePropertyIndex === 0 ? this.activeOwner.properties.length - 1 : this.activePropertyIndex - 1; },
+        resetFilters() { this.filters = { city: '', zip: '', submarket: '', yearMin: null, yearMax: null, unitMin: null, unitMax: null, location: '', selectedOwnerStatusTags: [...this.availableStatusTags], selectedBlank: false, selectedOwnerStatuses: this.markerOptions.map(m => m.value) }; },
+        openEditLogModal(log, index) {
+            const d = new Date(log.timestamp);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            this.editingLog = { ...log, timestamp: d.toISOString().slice(0, 16) };
+            this.editingLogIndex = index;
+            this.showEditLogModal = true;
+        },
+        async saveEditedLog() {
+            if (!this.editingLog) return;
+            const updatedTimestamp = new Date(this.editingLog.timestamp).toISOString();
+            
+            try {
+                const { error } = await supabase.from('communication_logs').update({
+                    notes: this.editingLog.notes,
+                    date: updatedTimestamp,
+                }).eq('id', this.editingLog.id);
+                if (error) throw error;
+                
+                this.activeOwner.communicationLog[this.editingLogIndex].notes = this.editingLog.notes;
+                this.activeOwner.communicationLog[this.editingLogIndex].timestamp = updatedTimestamp;
+                this.closeEditLogModal();
+            } catch (error) {
+                alert(`Failed to save changes: ${error.message}`);
+            }
+        },
+        closeEditLogModal() { this.showEditLogModal = false; this.editingLog = null; this.editingLogIndex = null; },
+        async addOwner() {
+            const newName = this.addOwnerForm.name.trim();
+            if (!newName) { alert('Owner name cannot be empty.'); return; }
+            if (this.allOwners.some(o => o.name.toLowerCase() === newName.toLowerCase())) { alert('An owner with this name already exists.'); return; }
+            
+            const newOwnerPayload = {
+                owner_name: newName,
+                owner_email: this.addOwnerForm.email,
+                owner_address: this.addOwnerForm.residentialAddress,
+                marker_pin: 'Never Spoken',
+            };
+            if(this.addOwnerForm.phone) {
+                newOwnerPayload.phone_number_1 = this.addOwnerForm.phone;
+                newOwnerPayload.phone_label_1 = 'Main';
+                newOwnerPayload.spoken_1 = false;
+            }
+
+            try {
+                const { data, error } = await supabase.from('owners').insert(newOwnerPayload).select().single();
+                if (error) throw error;
+
+                const newOwner = {
+                    id: data.id, name: data.owner_name, status: data.marker_pin, email: data.owner_email,
+                    residentialAddress: data.owner_address,
+                    phones: this.addOwnerForm.phone ? [{ label: 'Main', number: this.addOwnerForm.phone, worked: false }] : [],
+                    statusTags: [], communicationLog: [], properties: [], callWithCellOnly: false
+                };
+                
+                this.allOwners.push(newOwner);
+                this.allOwners.sort((a, b) => a.name.localeCompare(b.name));
+                this.selectOwner(newOwner.id);
+                
+                this.showAddOwnerModal = false;
+                this.addOwnerForm = { name: '', email: '', residentialAddress: '', phone: '' };
+            } catch (error) {
+                alert(`Failed to add owner: ${error.message}`);
+            }
+        },
+        async pollForProperty(address) {
+            this.addPropertyStatusMessage = 'Confirming property creation...';
+            let attempts = 0;
+            const maxAttempts = 30;
+            const interval = setInterval(async () => {
+                attempts++;
+                if (attempts > maxAttempts) {
+                    clearInterval(interval);
+                    this.addPropertyStatusMessage = 'Confirmation timed out. Please refresh to see the new property.';
+                    return;
+                }
+                
+                try {
+                    const { count, error } = await supabase.from('properties').select('id', { count: 'exact', head: true }).eq('address', address);
+                    if (error) throw error;
+                    
+                    if (count > 0) {
+                        clearInterval(interval);
+                        this.isAddingProperty = false;
+                        this.propertyBeingAddedAddress = null;
+                        this.addPropertyStatusMessage = '';
+                    }
+                } catch(err) {
+                    clearInterval(interval);
+                    this.addPropertyStatusMessage = 'Error checking property. Please refresh.';
+                }
+            }, 500);
+        },
+        async addProperty() {
+            if (!this.addPropertyForm.selectedOwner) { alert('Please select an owner.'); return; }
+            if (!this.addPropertyForm.address.trim()) { alert('Address is required.'); return; }
+            
+            const owner = this.allOwners.find(o => o.id === this.addPropertyForm.selectedOwner.id);
+            if (!owner) { alert('Selected owner not found.'); return; }
+
+            const newPropertyPayload = { owner_id: owner.id, address: this.addPropertyForm.address.trim(), costar_number: this.addPropertyForm.costarNumber };
+            
+            this.isAddingProperty = true;
+            this.propertyBeingAddedAddress = newPropertyPayload.address;
+            
+            try {
+                const { data, error } = await supabase.from('properties').insert(newPropertyPayload).select().single();
+                if (error) throw error;
+                
+                const newProperty = {
+                    id: data.id, ownerId: data.owner_id, address: data.address, costarNumber: data.costar_number,
+                    images: [], propertyName: '', city: '', state: '', zip: '', yearBuilt: null, submarket: '',
+                    units: null, parcelNumber: '', longitude: null, latitude: null, coStarLink: '', tpsLink: '', llcLink: '', location: '',
+                };
+                
+                if (!owner.properties) owner.properties = [];
+                owner.properties.push(newProperty);
+                this.selectOwner(owner.id);
+                this.activePropertyIndex = owner.properties.length - 1;
+                
+                this.showAddPropertyModal = false;
+                this.addPropertyForm = { selectedOwner: null, address: '', costarNumber: '' };
+                this.ownerSearchQuery = '';
+                this.filteredOwnerOptions = [];
+                this.pollForProperty(newProperty.address);
+            } catch (error) {
+                alert(`Failed to add property: ${error.message}`);
+                this.isAddingProperty = false;
+            }
+        },
+        openChangeOwnerModal() { if (!this.activeProperty) return; this.showChangeOwnerModal = true; },
+        closeChangeOwnerModal() { this.showChangeOwnerModal = false; this.changeOwnerSearchQuery = ''; this.filteredChangeOwnerOptions = []; this.showChangeOwnerDropdown = false; this.newOwnerSelection = null; },
+        filterChangeOwnerOptions() { this.showChangeOwnerDropdown = true; this.filteredChangeOwnerOptions = this.allOwners.filter(o => o.id !== this.activeOwnerId && o.name.toLowerCase().includes(this.changeOwnerSearchQuery.toLowerCase())); },
+        selectNewOwner(owner) { this.newOwnerSelection = owner; this.changeOwnerSearchQuery = owner.name; this.showChangeOwnerDropdown = false; },
+        async executeChangeOwner() {
+            if (!this.newOwnerSelection || !this.activeProperty) return;
+            this.isLoading = true;
+            this.loadingMessage = 'Transferring property...';
+
+            try {
+                const { error } = await supabase.from('properties').update({ owner_id: this.newOwnerSelection.id }).eq('id', this.activeProperty.id);
+                if (error) throw error;
+                
+                const propertyToMove = this.activeOwner.properties.splice(this.activePropertyIndex, 1)[0];
+                const newOwner = this.allOwners.find(o => o.id === this.newOwnerSelection.id);
+                if (!newOwner.properties) newOwner.properties = [];
+                newOwner.properties.push(propertyToMove);
+                
+                const newPropertyIndex = newOwner.properties.length - 1;
+                
+                this.selectOwner(newOwner.id);
+                this.$nextTick(() => {
+                    this.activePropertyIndex = newPropertyIndex;
+                    const el = this.$refs.ownerListContainer.querySelector(`#owner-item-${newOwner.id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            } catch(error) {
+                alert(`Error during transfer: ${error.message}`);
+            } finally {
+                this.isLoading = false;
+                this.closeChangeOwnerModal();
+            }
+        },
+        applyDateFilter() { if (this.newDateFilter) this.currentDate = this.newDateFilter; },
+        getFieldColor(value) { return value && String(value).trim() ? 'green-field' : 'yellow-field'; },
+        getMarkerClass(marker, type) { const colors = { 'IPA': 'bg-gray-800', 'Spoken To': 'bg-green-500', 'Listed': 'bg-orange-500', 'WR / ND': 'bg-yellow-400 text-black', 'Never Spoken': 'bg-blue-500', 'Condo/Religious': 'bg-pink-500', 'Broker': 'bg-purple-500', 'TCG': 'bg-gray-800' }; return type === 'bg' ? (colors[marker] || 'bg-gray-400') : ''; },
+        getLocationClass(location) { const found = this.locationOptions.find(opt => opt.value === location); return found ? found.class : 'location-default'; },
+        getTaskClass(status) { if (status === 'overdue') return 'overdue-task'; if (status === 'today') return 'today-task'; return 'future-task'; },
+        getPropertyMarkerColor(owner) { return this.getMarkerClass(owner.status, 'bg'); },
+        getStatusTagClass(status) { const classMap = { 'Buyer': 'tag-buyer', 'Seller': 'tag-seller', 'Meeting': 'tag-meeting', 'Proposal': 'tag-proposal', '1031': 'tag-1031', 'Talker': 'tag-talker', '6 Months Seller': 'tag-6months', 'Market Updates': 'tag-market', 'Developer': 'tag-developer', 'IPA': 'tag-ipa', 'Email': 'tag-email' }; return classMap[status] || 'bg-gray-200 text-gray-800'; },
+        toggleStatusTag(status) { if (!this.activeOwner.statusTags) this.activeOwner.statusTags = []; const i = this.activeOwner.statusTags.indexOf(status); if (i > -1) this.activeOwner.statusTags.splice(i, 1); else this.activeOwner.statusTags.push(status); this.autoSave(); },
+        removeStatusTag(tag) { if (!this.activeOwner.statusTags) return; this.activeOwner.statusTags = this.activeOwner.statusTags.filter(t => t !== tag); this.autoSave(); },
+        addPhoneNumber() { if (!this.activeOwner.phones) this.activeOwner.phones = []; if (this.activeOwner.phones.length < 5) { this.activeOwner.phones.push({ label: '', number: '', worked: false }); this.autoSave(); } else { alert('Maximum of 5 phone numbers reached.'); } },
+        removePhoneNumber(index) { this.activeOwner.phones?.splice(index, 1); this.autoSave(); },
+        formatPhoneNumberForTel(numberStr) { if (!numberStr) return ''; return numberStr.toString().replace(/\D/g,''); },
+        selectOwnerForProperty(owner) { this.addPropertyForm.selectedOwner = owner; this.ownerSearchQuery = owner.name; this.showOwnerDropdown = false; },
+        filterOwnerOptions() { if (this.ownerSearchQuery) { this.showOwnerDropdown = true; this.filteredOwnerOptions = this.allOwners.filter(o => o.name.toLowerCase().includes(this.ownerSearchQuery.toLowerCase())); } else { this.showOwnerDropdown = false; this.filteredOwnerOptions = []; } },
+        openImageModal(index) { this.editingImageIndex = index; this.newImageUrl = this.activeProperty.images[index] || ''; this.showImageModal = true; },
+        closeImageModal() { this.showImageModal = false; this.newImageUrl = ''; this.editingImageIndex = null; },
+        addImage() { if (this.newImageUrl && this.editingImageIndex !== null) { if (!this.activeProperty.images) this.activeProperty.images = []; this.activeProperty.images.splice(this.editingImageIndex, 1, this.newImageUrl); this.closeImageModal(); this.autoSave(); } },
+        removeImage(index) { this.activeProperty.images?.splice(index, 1); this.autoSave(); },
+        handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => { this.newImageUrl = e.target.result; };
+            reader.readAsDataURL(file);
+        },
+        formatDateTime(dateStr) { if (!dateStr) return ''; return new Date(dateStr).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); },
+        formatTaskDate(dateStr) { if (!dateStr) return ''; const date = new Date(dateStr + 'T00:00:00'); const today = new Date(this.currentDate + 'T00:00:00'); if (date.getTime() === today.getTime()) return 'Today'; return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); },
+        confirmDeleteOwner(owner) {
+            this.deleteConfirmMessage = `Are you sure you want to delete ${owner.name}? They own ${(owner.properties || []).length} properties. This will NOT delete their properties.`;
+            this.deleteConfirmAction = () => this.executeOwnerDeletion(owner.id);
+            this.showDeleteConfirmModal = true;
+        },
+        confirmDeleteProperty() {
+            if (!this.activeProperty) return;
+            this.deleteConfirmMessage = `Are you sure you want to delete the property at "${this.activeProperty.address}"? This cannot be undone.`;
+            this.deleteConfirmAction = () => this.executePropertyDeletion(this.activeProperty.id);
+            this.showDeleteConfirmModal = true;
+        },
+        async executeOwnerDeletion(ownerId) {
+            this.isLoading = true; this.loadingMessage = `Deleting owner...`; this.cancelDelete();
+            try {
+                const { error } = await supabase.from('owners').delete().eq('id', ownerId);
+                if (error) throw error;
+                
+                const index = this.allOwners.findIndex(o => o.id === ownerId);
+                if (index > -1) {
+                    this.allOwners.splice(index, 1);
+                    if (this.activeOwnerId === ownerId) {
+                        this.selectOwner(this.softSortedOwners[0]?.id || null);
+                    }
+                }
+            } catch(error) {
+                alert(`Deletion failed: ${error.message}`);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        async executePropertyDeletion(propertyId) {
+            this.isLoading = true; this.loadingMessage = 'Deleting property...'; this.cancelDelete();
+            try {
+                const { error } = await supabase.from('properties').delete().eq('id', propertyId);
+                if (error) throw error;
+                
+                const pIndex = this.activeOwner.properties.findIndex(p => p.id === propertyId);
+                if (pIndex > -1) {
+                    this.activeOwner.properties.splice(pIndex, 1);
+                    if (this.activePropertyIndex >= this.activeOwner.properties.length) {
+                        this.activePropertyIndex = Math.max(0, this.activeOwner.properties.length - 1);
+                    }
+                    this.initializeOrUpdateMap();
+                }
+            } catch(error) {
+                alert(`Deletion failed: ${error.message}`);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        executeDeleteAction() { if (this.deleteConfirmAction) this.deleteConfirmAction(); },
+        cancelDelete() { this.showDeleteConfirmModal = false; this.deleteConfirmAction = null; this.deleteConfirmMessage = ''; },
+        openStatusBreakdownModal() {
+            this.showStatusBreakdownModal = true;
+            this.$nextTick(() => {
+                if (this.statusChart) this.statusChart.destroy();
+                const data = this.statusBreakdownData;
+                if (data.labels.length === 0) return;
+                this.statusChart = new Chart(this.$refs.statusChartCanvas, {
+                    type: 'pie',
+                    data: { labels: data.labels, datasets: [{ data: data.counts, backgroundColor: data.colors }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
+                });
+            });
+        },
+
+        // --- Call Tracker & Template Methods ---
+        async logCall(number) {
+            if(!this.activeOwner) { alert("Please select an owner to log a call."); return; }
+            
+            const now = new Date();
+            const logEntry = { 
+                owner_id: this.activeOwner.id, 
+                type: 'Call', 
+                notes: `Called ${number || 'number on file'}.`, 
+                date: now.toISOString() 
+            };
+            
+            try {
+                // Save the log
+                const { data, error } = await supabase.from('communication_logs').insert(logEntry).select().single();
+                if (error) throw error;
+
+                // Update UI immediately
+                if(!this.activeOwner.communicationLog) this.activeOwner.communicationLog = [];
+                this.activeOwner.communicationLog.unshift({ id: data.id, ownerId: data.owner_id, timestamp: data.date, type: data.type, notes: data.notes });
+                this.activeOwner.lastSpoken = now.toISOString().split('T')[0];
+                
+                // Trigger a full save to update owner's last_spoken date
+                this.autoSave();
+                
+                // Update call tracker if it's open
+                if (this.callTrackerData) {
+                    this.callTrackerData.todayCalls++;
+                    this.renderCallChart();
+                }
+                
+                console.log("Call logged successfully.");
+
+            } catch(err) {
+                alert('Error logging call: ' + err.message);
+            }
+        },
+        async openCallTracker() {
+            this.showCallTrackerModal = true;
+            this.callTrackerData = null;
+            // Placeholder: A real implementation would fetch this from an RPC/aggregation in Supabase.
+            this.$nextTick(() => {
+                const today = new Date().toDateString();
+                const todayCalls = this.allOwners.reduce((acc, owner) => {
+                    return acc + (owner.communicationLog || []).filter(log => log.type === 'Call' && new Date(log.timestamp).toDateString() === today).length;
+                }, 0);
+
+                this.callTrackerData = {
+                    todayCalls: todayCalls,
+                    weekAvg: 'N/A', // Requires backend aggregation
+                    monthAvg: 'N/A', // Requires backend aggregation
+                    dates: { weekly: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], monthly: ['W1', 'W2', 'W3', 'W4'] },
+                    callCounts: { weekly: [5, 8, 12, 7, 10, 3, 1], monthly: [32, 40, 28, 35] } // Dummy data
+                };
+                this.renderCallChart();
+            });
+        },
+        renderCallChart() {
+            if (!this.callTrackerData || !this.$refs.callChartCanvas) return;
+            if (this.callChart) { this.callChart.destroy(); }
+            const labels = this.callTrackerData.dates[this.callTrackerView];
+            const data = this.callTrackerData.callCounts[this.callTrackerView];
+            this.callChart = new Chart(this.$refs.callChartCanvas, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Calls', data, backgroundColor: '#e67e22', borderColor: '#d35400', borderWidth: 1 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, suggestedMax: 55 } },
+                    plugins: { 
+                        legend: { display: false }, 
+                        annotation: { annotations: {
+                            line1: { type: 'line', yMin: 1, yMax: 1, borderColor: '#ccc', borderWidth: 1, borderDash: [6, 6], label: { content: '1', enabled: true, position: 'start' } },
+                            line20: { type: 'line', yMin: 20, yMax: 20, borderColor: '#ccc', borderWidth: 1, borderDash: [6, 6], label: { content: '20', enabled: true, position: 'start' } },
+                            line30: { type: 'line', yMin: 30, yMax: 30, borderColor: '#ccc', borderWidth: 1, borderDash: [6, 6], label: { content: '30', enabled: true, position: 'start' } },
+                            line40: { type: 'line', yMin: 40, yMax: 40, borderColor: '#ccc', borderWidth: 1, borderDash: [6, 6], label: { content: '40', enabled: true, position: 'start' } },
+                            line50: { type: 'line', yMin: 50, yMax: 50, borderColor: '#ccc', borderWidth: 1, borderDash: [6, 6], label: { content: '50', enabled: true, position: 'start' } }
+                        }}
+                    }
+                }
+            });
+        },
+        applyLogTemplate(template) {
+            this.newLog.type = template.type;
+            this.newLog.notes = template.text;
+        },
+        async addNewTemplate() {
+            if (!this.newTemplateText.trim()) return;
+            // Placeholder for Supabase insert
+            console.warn("addNewTemplate: Supabase table for templates not specified, skipping.");
+            this.logTemplates.push({id: Date.now(), text: this.newTemplateText.trim(), type: this.newTemplateType});
+            this.newTemplateText = '';
+        },
+        async deleteLogTemplate(templateId) {
+            if (!confirm('Are you sure you want to delete this template?')) return;
+             // Placeholder for Supabase delete
+            console.warn("deleteLogTemplate: Supabase table for templates not specified, skipping.");
+            this.logTemplates = this.logTemplates.filter(t => t.id !== templateId);
+        },
+    }));
+});
+</script>
+</body>
+</html>
