@@ -1681,11 +1681,11 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Land Area (SF)</label>
-                        <input type="number" class="form-input" value="${currentProperty.land_area_sf || ''}" onchange="updateProperty('land_area_sf', this.value)">
+                        <input type="number" class="form-input ${highlightField(currentProperty.land_area_sf)}" value="${currentProperty.land_area_sf || ''}" onchange="updateProperty('land_area_sf', this.value)">
                     </div>
                      <div class="form-group">
                         <label class="form-label">Land Area (AC)</label>
-                        <input type="number" class="form-input" value="${currentProperty.land_area_ac || ''}" onchange="updateProperty('land_area_ac', this.value)">
+                        <input type="number" class="form-input ${highlightField(currentProperty.land_area_ac)}" value="${currentProperty.land_area_ac || ''}" onchange="updateProperty('land_area_ac', this.value)">
                     </div>
                 </div>
 
@@ -1693,7 +1693,7 @@
                  <div class="form-grid" style="gap: 8px 15px;">
                     <div class="form-group">
                         <label class="form-label">Interest Rate</label>
-                        <input type="number" class="form-input" value="${currentProperty.interest_rate || ''}" onchange="updateProperty('interest_rate', this.value)">
+                        <input type="number" class="form-input ${highlightField(currentProperty.interest_rate)}" value="${currentProperty.interest_rate || ''}" onchange="updateProperty('interest_rate', this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Loan Type</label>
@@ -1709,14 +1709,14 @@
                 <div class="form-grid" style="gap: 8px 15px;">
                     <div class="form-group">
                         <label class="form-label">For Sale Status</label>
-                        <select class="form-input" onchange="updateProperty('for_sale_status', this.value)" style="color: ${currentProperty.for_sale_status === 'Y' ? '#e67e22' : '#6c757d'}">
-                            <option value="N" ${currentProperty.for_sale_status !== 'Y' ? 'selected' : ''} style="color: #6c757d;">No</option>
-                            <option value="Y" ${currentProperty.for_sale_status === 'Y' ? 'selected' : ''} style="color: #e67e22;">Yes</option>
+                        <select class="form-input" onchange="updateProperty('for_sale_status', this.value)" style="background-color: ${currentProperty.for_sale_status === 'Y' ? '#E8F5E9' : '#f0f0f0'};">
+                            <option value="N" ${currentProperty.for_sale_status !== 'Y' ? 'selected' : ''}>No</option>
+                            <option value="Y" ${currentProperty.for_sale_status === 'Y' ? 'selected' : ''}>Yes</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">For Sale Price</label>
-                        <input type="number" class="form-input" value="${currentProperty.for_sale_price || ''}" onchange="updateProperty('for_sale_price', this.value)">
+                        <input type="number" class="form-input ${highlightField(currentProperty.for_sale_price)}" value="${currentProperty.for_sale_price || ''}" onchange="updateProperty('for_sale_price', this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Day Listed</label>
@@ -1732,7 +1732,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Last Sale Price</label>
-                        <input type="number" class="form-input" value="${currentProperty.last_sale_price || ''}" onchange="updateProperty('last_sale_price', this.value)">
+                        <input type="number" class="form-input ${highlightField(currentProperty.last_sale_price)}" value="${currentProperty.last_sale_price || ''}" onchange="updateProperty('last_sale_price', this.value)">
                     </div>
                      <div class="form-group">
                         <label class="form-label">Last Sale Date</label>
@@ -2563,8 +2563,7 @@
                     const { data, error } = await supabase
                         .from('owners')
                         .select('id, owner_name')
-                        .ilike('owner_name', `%${query}%`)
-                        .limit(50); // Limit results for performance
+                        .ilike('owner_name', `%${query}%`);
 
                     if (error) throw error;
 
