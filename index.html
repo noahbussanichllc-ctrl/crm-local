@@ -1458,6 +1458,14 @@
                         <label class="form-label">Next Follow-Up</label>
                         <input type="date" class="form-input ${highlightField(currentOwner.next_follow_up)}" value="${currentOwner.next_follow_up || ''}" onchange="updateOwner('next_follow_up', this.value)">
                     </div>
+                     <div class="form-group">
+                        <label class="form-label">Owner Address</label>
+                        <input type="text" class="form-input ${highlightField(currentOwner.owner_address)}" value="${currentOwner.owner_address || ''}" onchange="updateOwner('owner_address', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Owner Email</label>
+                        <input type="email" class="form-input ${highlightField(currentOwner.owner_email)}" value="${currentOwner.owner_email || ''}" onchange="updateOwner('owner_email', this.value)">
+                    </div>
                 </div>
                 <div class="section-title" style="margin-top: 30px;">Phone Numbers</div>
                 <table class="phone-table">
@@ -1698,6 +1706,50 @@
 
         // Update Owner
         async function updateOwner(field, value) {
+            // Special handling for next_follow_up for optimistic UI update
+            if (field === 'next_follow_up') {
+                const oldDate = currentOwner.next_follow_up;
+                const ownerIndex = allOwners.findIndex(o => o.id === currentOwner.id);
+
+                // 1. Optimistically update local data
+                currentOwner.next_follow_up = value;
+                if (ownerIndex !== -1) allOwners[ownerIndex].next_follow_up = value;
+
+                // 2. Immediately refresh the follow-up list
+                loadFollowUpTasks();
+
+                try {
+                    // 3. Update database
+                    const { data, error } = await supabase
+                        .from('owners')
+                        .update({ next_follow_up: value })
+                        .eq('id', currentOwner.id)
+                        .select()
+                        .single();
+
+                    if (error) throw error;
+
+                    // 4. On success, confirm data and re-render the center panel
+                    Object.assign(currentOwner, data);
+                    if (ownerIndex !== -1) Object.assign(allOwners[ownerIndex], data);
+                    await renderCenterPanel();
+
+                } catch (error) {
+                    console.error('Error updating next_follow_up:', error);
+                    alert('Failed to update follow-up date. Reverting changes.');
+
+                    // 5. On failure, revert local data
+                    currentOwner.next_follow_up = oldDate;
+                    if (ownerIndex !== -1) allOwners[ownerIndex].next_follow_up = oldDate;
+
+                    // 6. Refresh UI back to its original state
+                    loadFollowUpTasks();
+                    await renderCenterPanel();
+                }
+                return; // End execution for this special case
+            }
+
+            // Original logic for all other fields
             try {
                 const { data, error } = await supabase
                     .from('owners')
@@ -1714,11 +1766,6 @@
 
                 if (field === 'marker_pin' || field === 'status_tags') {
                     renderOwnersList();
-                }
-
-                // If the follow-up date changes, refresh the tasks list
-                if (field === 'next_follow_up') {
-                    loadFollowUpTasks();
                 }
 
                 await renderCenterPanel();
