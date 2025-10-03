@@ -1503,11 +1503,11 @@
                     </div>
                      <div class="form-group">
                         <label class="form-label">Birth Year</label>
-                        <input type="number" class="form-input" value="${currentOwner.birth_year || ''}" onchange="updateOwner('birth_year', this.value)">
+                        <input type="number" class="form-input ${highlightField(currentOwner.birth_year)}" value="${currentOwner.birth_year || ''}" onchange="updateOwner('birth_year', this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Birth Month</label>
-                        <select class="form-input" onchange="updateOwner('birth_month', this.value)">
+                        <select class="form-input ${highlightField(currentOwner.birth_month)}" onchange="updateOwner('birth_month', this.value)">
                             <option value="" ${!currentOwner.birth_month ? 'selected' : ''}>Select Month</option>
                             ${[
                                 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -1517,11 +1517,11 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Age</label>
-                        <input type="number" class="form-input" value="${currentOwner.age || ''}" onchange="updateOwner('age', this.value)">
+                        <input type="number" class="form-input ${highlightField(currentOwner.age)}" value="${currentOwner.age || ''}" onchange="updateOwner('age', this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Hobbies / Interests</label>
-                        <input type="text" class="form-input" value="${currentOwner.hobbies_interests || ''}" onchange="updateOwner('hobbies_interests', this.value)">
+                        <input type="text" class="form-input ${highlightField(currentOwner.hobbies_interests)}" value="${currentOwner.hobbies_interests || ''}" onchange="updateOwner('hobbies_interests', this.value)">
                     </div>
                 </div>
 
@@ -1615,7 +1615,7 @@
                     </div>
                 </div>
                 <div class="section-title" style="margin-top: 30px;">Property Information</div>
-                <div class="form-grid">
+                <div class="form-grid" style="gap: 8px 15px;">
                     <div class="form-group full-width">
                         <label class="form-label">Address</label>
                         <input type="text" class="form-input ${highlightField(currentProperty.address)}" value="${currentProperty.address || ''}" onchange="updateProperty('address', this.value)">
@@ -1648,25 +1648,9 @@
                         <label class="form-label">Units</label>
                         <input type="number" class="form-input ${highlightField(currentProperty.units)}" value="${currentProperty.units || ''}" onchange="updateProperty('units', this.value)">
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Parcel #</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.parcel_number)}" value="${currentProperty.parcel_number || ''}" onchange="updateProperty('parcel_number', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">CoStar #</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.costar_number)}" value="${currentProperty.costar_number || ''}" onchange="updateProperty('costar_number', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Property ID</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.property_id)}" value="${currentProperty.property_id || ''}" onchange="updateProperty('property_id', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">First Meeting</label>
-                        <input type="date" class="form-input" value="${currentProperty.first_meeting || ''}" onchange="updateProperty('first_meeting', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Proposal</label>
-                        <input type="checkbox" class="form-input" ${currentProperty.proposal ? 'checked' : ''} onchange="updateProperty('proposal', this.checked)">
+                     <div class="form-group">
+                        <label class="form-label">Property Type</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.property_type)}" value="${currentProperty.property_type || ''}" onchange="updateProperty('property_type', this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Location</label>
@@ -1676,45 +1660,6 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Longitude</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.long)}" value="${currentProperty.long || ''}" onchange="updateProperty('long', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Latitude</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.latt)}" value="${currentProperty.latt || ''}" onchange="updateProperty('latt', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Property Type</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.property_type)}" value="${currentProperty.property_type || ''}" onchange="updateProperty('property_type', this.value)">
-                    </div>
-                </div>
-
-                <div class="section-title" style="margin-top: 30px;">Sale Information</div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">For Sale Status</label>
-                        <select class="form-input" onchange="updateProperty('for_sale_status', this.value)" style="color: ${currentProperty.for_sale_status === 'Y' ? '#e67e22' : '#6c757d'}">
-                            <option value="N" ${currentProperty.for_sale_status === 'N' ? 'selected' : ''} style="color: #6c757d;">No</option>
-                            <option value="Y" ${currentProperty.for_sale_status === 'Y' ? 'selected' : ''} style="color: #e67e22;">Yes</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Day Listed</label>
-                        <input type="date" class="form-input" value="${currentProperty.day_listed || ''}" onchange="updateProperty('day_listed', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">For Sale Price</label>
-                        <input type="number" class="form-input" value="${currentProperty.for_sale_price || ''}" onchange="updateProperty('for_sale_price', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Last Sale Price</label>
-                        <input type="number" class="form-input" value="${currentProperty.last_sale_price || ''}" onchange="updateProperty('last_sale_price', this.value)">
-                    </div>
-                     <div class="form-group">
-                        <label class="form-label">Last Sale Date</label>
-                        <input type="date" class="form-input" value="${currentProperty.last_sale_date || ''}" onchange="updateProperty('last_sale_date', this.value)">
-                    </div>
-                    <div class="form-group">
                         <label class="form-label">County</label>
                         <input type="text" class="form-input ${highlightField(currentProperty.county_name)}" value="${currentProperty.county_name || ''}" onchange="updateProperty('county_name', this.value)">
                     </div>
@@ -1722,14 +1667,30 @@
                         <label class="form-label">Zoning</label>
                         <input type="text" class="form-input ${highlightField(currentProperty.zoning)}" value="${currentProperty.zoning || ''}" onchange="updateProperty('zoning', this.value)">
                     </div>
-                     <div class="form-group">
+                    <div class="form-group">
                         <label class="form-label">Property Manager</label>
                         <input type="text" class="form-input ${highlightField(currentProperty.property_manager_name)}" value="${currentProperty.property_manager_name || ''}" onchange="updateProperty('property_manager_name', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Parcel #</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.parcel_number)}" value="${currentProperty.parcel_number || ''}" onchange="updateProperty('parcel_number', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">CoStar #</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.costar_number)}" value="${currentProperty.costar_number || ''}" onchange="updateProperty('costar_number', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Land Area (SF)</label>
+                        <input type="number" class="form-input" value="${currentProperty.land_area_sf || ''}" onchange="updateProperty('land_area_sf', this.value)">
+                    </div>
+                     <div class="form-group">
+                        <label class="form-label">Land Area (AC)</label>
+                        <input type="number" class="form-input" value="${currentProperty.land_area_ac || ''}" onchange="updateProperty('land_area_ac', this.value)">
                     </div>
                 </div>
 
                 <div class="section-title" style="margin-top: 30px;">Loan Information</div>
-                 <div class="form-grid">
+                 <div class="form-grid" style="gap: 8px 15px;">
                     <div class="form-group">
                         <label class="form-label">Interest Rate</label>
                         <input type="number" class="form-input" value="${currentProperty.interest_rate || ''}" onchange="updateProperty('interest_rate', this.value)">
@@ -1742,13 +1703,40 @@
                         <label class="form-label">Maturity Date</label>
                         <input type="date" class="form-input" value="${currentProperty.maturity_date || ''}" onchange="updateProperty('maturity_date', this.value)">
                     </div>
-                     <div class="form-group">
-                        <label class="form-label">Land Area (SF)</label>
-                        <input type="number" class="form-input" value="${currentProperty.land_area_sf || ''}" onchange="updateProperty('land_area_sf', this.value)">
+                </div>
+
+                <div class="section-title" style="margin-top: 30px;">Sale Information</div>
+                <div class="form-grid" style="gap: 8px 15px;">
+                    <div class="form-group">
+                        <label class="form-label">For Sale Status</label>
+                        <select class="form-input" onchange="updateProperty('for_sale_status', this.value)" style="color: ${currentProperty.for_sale_status === 'Y' ? '#e67e22' : '#6c757d'}">
+                            <option value="N" ${currentProperty.for_sale_status !== 'Y' ? 'selected' : ''} style="color: #6c757d;">No</option>
+                            <option value="Y" ${currentProperty.for_sale_status === 'Y' ? 'selected' : ''} style="color: #e67e22;">Yes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">For Sale Price</label>
+                        <input type="number" class="form-input" value="${currentProperty.for_sale_price || ''}" onchange="updateProperty('for_sale_price', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Day Listed</label>
+                        <input type="date" class="form-input" value="${currentProperty.day_listed || ''}" onchange="updateProperty('day_listed', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cap Rate</label>
+                        <input type="number" class="form-input ${highlightField(currentProperty.cap_rate)}" value="${currentProperty.cap_rate || ''}" onchange="updateProperty('cap_rate', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Price / Unit</label>
+                        <input type="number" class="form-input ${highlightField(currentProperty.price_unit)}" value="${currentProperty.price_unit || ''}" onchange="updateProperty('price_unit', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Sale Price</label>
+                        <input type="number" class="form-input" value="${currentProperty.last_sale_price || ''}" onchange="updateProperty('last_sale_price', this.value)">
                     </div>
                      <div class="form-group">
-                        <label class="form-label">Land Area (AC)</label>
-                        <input type="number" class="form-input" value="${currentProperty.land_area_ac || ''}" onchange="updateProperty('land_area_ac', this.value)">
+                        <label class="form-label">Last Sale Date</label>
+                        <input type="date" class="form-input" value="${currentProperty.last_sale_date || ''}" onchange="updateProperty('last_sale_date', this.value)">
                     </div>
                 </div>
             `;
