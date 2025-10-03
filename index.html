@@ -1711,6 +1711,9 @@
                 const oldDate = currentOwner.next_follow_up;
                 const ownerIndex = allOwners.findIndex(o => o.id === currentOwner.id);
 
+                // If value is an empty string, it means the date was cleared. Use null for the database.
+                const valueForDb = value === '' ? null : value;
+
                 // 1. Optimistically update local data
                 currentOwner.next_follow_up = value;
                 if (ownerIndex !== -1) allOwners[ownerIndex].next_follow_up = value;
@@ -1722,7 +1725,7 @@
                     // 3. Update database
                     const { data, error } = await supabase
                         .from('owners')
-                        .update({ next_follow_up: value })
+                        .update({ next_follow_up: valueForDb })
                         .eq('id', currentOwner.id)
                         .select()
                         .single();
@@ -1808,7 +1811,9 @@
         function formatDate(dateString) {
             if (!dateString) return 'No date';
             const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            // Use timeZone: 'UTC' to prevent the date from being shifted to the previous day
+            // due to the user's local timezone.
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
         }
 
         // Delete Property
