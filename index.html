@@ -739,6 +739,31 @@
         select.form-input {
             cursor: pointer;
         }
+
+        .marker-pin {
+            width: 30px;
+            height: 30px;
+            border-radius: 50% 50% 50% 0;
+            background: #c30b0b;
+            position: absolute;
+            transform: rotate(-45deg);
+            left: 50%;
+            top: 50%;
+            margin: -15px 0 0 -15px;
+        }
+        .marker-pin::after {
+            content: '';
+            width: 14px;
+            height: 14px;
+            margin: 8px 0 0 8px;
+            background: #fff;
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        select.status-dropdown option {
+            padding: 5px;
+        }
     </style>
 </head>
 <body>
@@ -1061,7 +1086,7 @@
         let currentPropertyIndex = 0;
         let ownerProperties = [];
         let map = null;
-        let marker = null;
+        let propertyMarkers = [];
 
         // Performance-related state
         let searchDebounceTimer;
@@ -1244,180 +1269,164 @@
             return value ? 'highlight-green' : 'highlight-yellow';
         }
 
+        function updateMapForOwner() {
+            // 1. Clear existing markers
+            propertyMarkers.forEach(marker => marker.remove());
+            propertyMarkers = [];
+
+            if (!currentOwner || ownerProperties.length === 0) {
+                map.setView([45.5231, -122.6765], 11); // Reset view if no properties
+                return;
+            }
+
+            const bounds = [];
+
+            // 2. Add a marker for each property
+            ownerProperties.forEach((prop, index) => {
+                if (prop.latt && prop.long) {
+                    const lat = parseFloat(prop.latt);
+                    const lng = parseFloat(prop.long);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const isSelected = index === currentPropertyIndex;
+                        const marker = L.marker([lat, lng], {
+                            icon: L.divIcon({
+                                className: 'custom-div-icon',
+                                html: `<div style='background-color:${isSelected ? "#e67e22" : "#2B5AA8"};' class='marker-pin'></div>`,
+                                iconSize: [30, 42],
+                                iconAnchor: [15, 42]
+                            })
+                        }).addTo(map);
+
+                        marker.bindPopup(`<b>${prop.address || 'Property'}</b>`);
+                        propertyMarkers.push(marker);
+                        bounds.push([lat, lng]);
+                    }
+                }
+            });
+
+            // 3. Zoom to fit all markers, or to the selected one
+            if (bounds.length > 0) {
+                 if (currentProperty && currentProperty.latt && currentProperty.long) {
+                    map.setView([currentProperty.latt, currentProperty.long], 15);
+                } else {
+                    map.fitBounds(bounds);
+                }
+            }
+        }
+
+        function populateOwnerStatusDropdown() {
+            const select = document.getElementById('ownerStatusSelect');
+            if (!select) return;
+
+            select.innerHTML = '';
+            for (const status in STATUS_OPTIONS) {
+                const option = document.createElement('option');
+                option.value = status;
+                option.textContent = status;
+                option.style.color = STATUS_OPTIONS[status];
+                if (status === currentOwner.marker_pin) {
+                    option.selected = true;
+                    select.style.color = STATUS_OPTIONS[status];
+                }
+                select.appendChild(option);
+            }
+            select.onchange = (e) => {
+                select.style.color = STATUS_OPTIONS[e.target.value];
+                updateOwner('marker_pin', e.target.value);
+            };
+        }
+
         // Render Property Details
         async function renderPropertyDetails() {
-            if (!currentProperty) return;
+            if (!currentOwner) return;
 
             const centerPanel = document.getElementById('centerPanel');
 
+            let propertyHtml = '';
+            if (currentProperty) {
+                propertyHtml = `
+                    <div class="property-header">
+                        <div class="property-title">
+                            ${currentProperty.address || 'No Address'}
+                            <button class="phone-action-btn" style="margin-left: 15px;" onclick="deleteProperty()">🗑️</button>
+                        </div>
+                        <div class="property-nav">
+                            <button class="btn btn-call" style="background-color: #e67e22;" onclick="showTransferPropertyModal()">Transfer</button>
+                            <button class="nav-btn" onclick="previousProperty()">◀</button>
+                            <span class="property-counter">${currentPropertyIndex + 1} of ${ownerProperties.length}</span>
+                            <button class="nav-btn" onclick="nextProperty()">▶</button>
+                        </div>
+                    </div>
+                    <div class="property-images">
+                         <div class="image-container">
+                            ${currentProperty.image_url_1 ? `<img src="${currentProperty.image_url_1}" alt="Property Image 1">` : 'Click + to add'}
+                            <div class="image-actions">
+                                <button onclick="showEditModal('property', 'image_url_1', 'Edit Image URL 1', 'Image URL', currentProperty.image_url_1)">➕</button>
+                                ${currentProperty.image_url_1 ? `<button onclick="updateProperty('image_url_1', null)">❌</button>` : ''}
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            ${currentProperty.image_url_2 ? `<img src="${currentProperty.image_url_2}" alt="Property Image 2">` : 'Click + to add'}
+                            <div class="image-actions">
+                                <button onclick="showEditModal('property', 'image_url_2', 'Edit Image URL 2', 'Image URL', currentProperty.image_url_2)">➕</button>
+                                ${currentProperty.image_url_2 ? `<button onclick="updateProperty('image_url_2', null)">❌</button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="link-buttons">
+                        <div class="link-btn-group">
+                            <a href="${currentProperty.costar_link || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentProperty.costar_link ? 'costar' : 'no-link'}">CoStar</a>
+                            <button class="link-action-btn" onclick="showEditModal('property', 'costar_link', 'Edit CoStar Link', 'URL', currentProperty.costar_link)">➕</button>
+                            <button class="link-action-btn" onclick="updateProperty('costar_link', null)">❌</button>
+                        </div>
+                        <div class="link-btn-group">
+                            <a href="${currentProperty.tps_link || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentProperty.tps_link ? 'tps' : 'no-link'}">TPS</a>
+                            <button class="link-action-btn" onclick="showEditModal('property', 'tps_link', 'Edit TPS Link', 'URL', currentProperty.tps_link)">➕</button>
+                            <button class="link-action-btn" onclick="updateProperty('tps_link', null)">❌</button>
+                        </div>
+                        <div class="link-btn-group">
+                            <a href="${currentProperty.llc_link || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentProperty.llc_link ? 'llc' : 'no-link'}">LLC</a>
+                            <button class="link-action-btn" onclick="showEditModal('property', 'llc_link', 'Edit LLC Link', 'URL', currentProperty.llc_link)">➕</button>
+                            <button class="link-action-btn" onclick="updateProperty('llc_link', null)">❌</button>
+                        </div>
+                    </div>
+                    <div class="section-title" style="margin-top: 30px;">Property Information</div>
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.address)}" value="${currentProperty.address || ''}" onchange="updateProperty('address', this.value)">
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Property Name</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.property_name)}" value="${currentProperty.property_name || ''}" onchange="updateProperty('property_name', this.value)">
+                        </div>
+                    </div>
+                `;
+            }
+
             centerPanel.innerHTML = `
-                <div class="property-header">
-                    <div class="property-title">
-                        ${currentProperty.address || 'No Address'}
-                        <button class="phone-action-btn" style="margin-left: 15px;" onclick="deleteProperty()">🗑️</button>
-                    </div>
-                    <div class="property-nav">
-                         <button class="btn btn-delete" onclick="showTransferPropertyModal()">Transfer</button>
-                        <button class="nav-btn" onclick="previousProperty()">◀</button>
-                        <span class="property-counter">${currentPropertyIndex + 1} of ${ownerProperties.length}</span>
-                        <button class="nav-btn" onclick="nextProperty()">▶</button>
-                    </div>
-                </div>
-
-                <div class="property-images">
-                    <div class="image-container">
-                        ${currentProperty.image_url_1 ? `<img src="${currentProperty.image_url_1}" alt="Property Image 1">` : 'Click + to add'}
-                        <div class="image-actions">
-                            <button onclick="showEditModal('property', 'image_url_1', 'Edit Image URL 1', 'Image URL', currentProperty.image_url_1)">➕</button>
-                            ${currentProperty.image_url_1 ? `<button onclick="updateProperty('image_url_1', null)">❌</button>` : ''}
-                        </div>
-                    </div>
-                    <div class="image-container">
-                        ${currentProperty.image_url_2 ? `<img src="${currentProperty.image_url_2}" alt="Property Image 2">` : 'Click + to add'}
-                        <div class="image-actions">
-                            <button onclick="showEditModal('property', 'image_url_2', 'Edit Image URL 2', 'Image URL', currentProperty.image_url_2)">➕</button>
-                            ${currentProperty.image_url_2 ? `<button onclick="updateProperty('image_url_2', null)">❌</button>` : ''}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="link-buttons">
-                    <div class="link-btn-group">
-                        <a href="${currentProperty.costar_link || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentProperty.costar_link ? 'costar' : 'no-link'}">CoStar</a>
-                        <button class="link-action-btn" onclick="showEditModal('property', 'costar_link', 'Edit CoStar Link', 'URL', currentProperty.costar_link)">➕</button>
-                        <button class="link-action-btn" onclick="updateProperty('costar_link', null)">❌</button>
-                    </div>
-                    <div class="link-btn-group">
-                        <a href="${currentProperty.tps_link || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentProperty.tps_link ? 'tps' : 'no-link'}">TPS</a>
-                        <button class="link-action-btn" onclick="showEditModal('property', 'tps_link', 'Edit TPS Link', 'URL', currentProperty.tps_link)">➕</button>
-                        <button class="link-action-btn" onclick="updateProperty('tps_link', null)">❌</button>
-                    </div>
-                    <div class="link-btn-group">
-                        <a href="${currentProperty.llc_link || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentProperty.llc_link ? 'llc' : 'no-link'}">LLC</a>
-                        <button class="link-action-btn" onclick="showEditModal('property', 'llc_link', 'Edit LLC Link', 'URL', currentProperty.llc_link)">➕</button>
-                        <button class="link-action-btn" onclick="updateProperty('llc_link', null)">❌</button>
-                    </div>
-                </div>
-
-                <div class="section-title" style="margin-top: 30px;">Property Information</div>
-                <div class="form-grid">
-                    <div class="form-group full-width">
-                        <label class="form-label">Address</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.address)}" value="${currentProperty.address || ''}"
-                            onchange="updateProperty('address', this.value)">
-                    </div>
-                    <div class="form-group full-width">
-                        <label class="form-label">Property Name</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.property_name)}" value="${currentProperty.property_name || ''}"
-                            onchange="updateProperty('property_name', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">City</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.city)}" value="${currentProperty.city || ''}"
-                            onchange="updateProperty('city', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">State</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.state)}" value="${currentProperty.state || ''}"
-                            onchange="updateProperty('state', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">ZIP</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.zip)}" value="${currentProperty.zip || ''}"
-                            onchange="updateProperty('zip', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Year Built</label>
-                        <input type="number" class="form-input ${highlightField(currentProperty.built)}" value="${currentProperty.built || ''}"
-                            onchange="updateProperty('built', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Submarket</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.submarket)}" value="${currentProperty.submarket || ''}"
-                            onchange="updateProperty('submarket', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Location</label>
-                        <select class="form-input ${highlightField(currentProperty.location)}" onchange="updateProperty('location', this.value)">
-                            <option value="">Select...</option>
-                            <option value="SE Portland" ${currentProperty.location === 'SE Portland' ? 'selected' : ''}>SE Portland</option>
-                            <option value="NE Portland" ${currentProperty.location === 'NE Portland' ? 'selected' : ''}>NE Portland</option>
-                            <option value="NW Portland" ${currentProperty.location === 'NW Portland' ? 'selected' : ''}>NW Portland</option>
-                            <option value="SW Portland" ${currentProperty.location === 'SW Portland' ? 'selected' : ''}>SW Portland</option>
-                            <option value="N Portland" ${currentProperty.location === 'N Portland' ? 'selected' : ''}>N Portland</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Parcel #</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.parcel_number)}" value="${currentProperty.parcel_number || ''}"
-                            onchange="updateProperty('parcel_number', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Property ID</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.property_id)}" value="${currentProperty.property_id || ''}"
-                            onchange="updateProperty('property_id', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">CoStar #</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.costar_number)}" value="${currentProperty.costar_number || ''}"
-                            onchange="updateProperty('costar_number', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Units</label>
-                        <input type="number" class="form-input ${highlightField(currentProperty.units)}" value="${currentProperty.units || ''}"
-                            onchange="updateProperty('units', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Longitude</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.long)}" value="${currentProperty.long || ''}"
-                            onchange="updateProperty('long', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Latitude</label>
-                        <input type="text" class="form-input ${highlightField(currentProperty.latt)}" value="${currentProperty.latt || ''}"
-                            onchange="updateProperty('latt', this.value)">
-                    </div>
-                </div>
-
-                <div class="section-title" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>
-                        Owner:
-                        <span id="ownerNameDisplay" style="font-weight: bold;">${currentOwner.owner_name}</span>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="font-size: 28px; color: #333;">
+                        ${currentOwner.owner_name}
                         <button class="phone-action-btn" onclick="showEditModal('owner', 'owner_name', 'Edit Owner Name', 'Name', currentOwner.owner_name)">✏️</button>
-                    </span>
-                    <button class="btn btn-delete" style="padding: 4px 8px; font-size: 14px;" onclick="deleteOwner()">🗑️ Delete Owner</button>
+                    </h1>
                 </div>
+                ${propertyHtml}
+                <div class="section-title" style="margin-top: 20px;">Owner Information</div>
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label">Owner Status</label>
-                        <select class="form-input" onchange="updateOwner('marker_pin', this.value)">
-                            ${Object.keys(STATUS_OPTIONS).map(status => `
-                                <option value="${status}" ${currentOwner.marker_pin === status ? 'selected' : ''}>${status}</option>
-                            `).join('')}
-                        </select>
+                        <select id="ownerStatusSelect" class="form-input status-dropdown" onchange="this.style.color = STATUS_OPTIONS[this.value]; updateOwner('marker_pin', this.value)"></select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Last Spoken</label>
-                        <input type="date" class="form-input" value="${currentOwner.last_spoken || ''}"
-                            onchange="updateOwner('last_spoken', this.value)">
+                        <input type="date" class="form-input" value="${currentOwner.last_spoken || ''}" onchange="updateOwner('last_spoken', this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Next Follow-Up</label>
-                        <input type="date" class="form-input ${highlightField(currentOwner.next_follow_up)}" value="${currentOwner.next_follow_up || ''}"
-                            onchange="updateOwner('next_follow_up', this.value)">
-                    </div>
-                    <div class="form-group full-width">
-                        <label class="form-label">Owner Address</label>
-                        <input type="text" class="form-input ${highlightField(currentOwner.owner_address)}" value="${currentOwner.owner_address || ''}"
-                            onchange="updateOwner('owner_address', this.value)">
-                    </div>
-                    <div class="form-group full-width">
-                        <label class="form-label">Owner Email</label>
-                        <input type="email" class="form-input ${highlightField(currentOwner.owner_email)}" value="${currentOwner.owner_email || ''}"
-                            onchange="updateOwner('owner_email', this.value)">
+                        <input type="date" class="form-input ${highlightField(currentOwner.next_follow_up)}" value="${currentOwner.next_follow_up || ''}" onchange="updateOwner('next_follow_up', this.value)">
                     </div>
                 </div>
-
                 <div class="section-title" style="margin-top: 30px;">Phone Numbers</div>
                 <table class="phone-table">
                     <thead>
@@ -1502,30 +1511,24 @@
 
         // Render no properties message
         function renderNoProperties() {
-            const centerPanel = document.getElementById('centerPanel');
-            centerPanel.innerHTML = `
-                <div style="text-align: center; padding: 100px 20px; color: #999;">
-                    <h2>No properties for this owner</h2>
-                    <p style="margin-top: 10px;">Click "Add Property" to add a property for ${currentOwner.owner_name}</p>
-                </div>
-            `;
+            // This function is now just a wrapper to render the owner details without property info.
+            currentProperty = null;
+            renderPropertyDetails();
         }
 
         // Navigation functions
         function previousProperty() {
-            if (currentPropertyIndex > 0) {
-                currentPropertyIndex--;
-                currentProperty = ownerProperties[currentPropertyIndex];
-                renderPropertyDetails();
-            }
+            if (ownerProperties.length === 0) return;
+            currentPropertyIndex = (currentPropertyIndex - 1 + ownerProperties.length) % ownerProperties.length;
+            currentProperty = ownerProperties[currentPropertyIndex];
+            renderPropertyDetails();
         }
 
         function nextProperty() {
-            if (currentPropertyIndex < ownerProperties.length - 1) {
-                currentPropertyIndex++;
-                currentProperty = ownerProperties[currentPropertyIndex];
-                renderPropertyDetails();
-            }
+            if (ownerProperties.length === 0) return;
+            currentPropertyIndex = (currentPropertyIndex + 1) % ownerProperties.length;
+            currentProperty = ownerProperties[currentPropertyIndex];
+            renderPropertyDetails();
         }
 
         // Update Property
@@ -1670,8 +1673,6 @@
 
                 // Re-render the property details to show the change immediately
                 await renderPropertyDetails();
-
-                alert('Phone number deleted.');
 
             } catch (error) {
                 console.error('Error deleting phone:', error);
@@ -1883,15 +1884,23 @@
         }
 
         function populateStatusDropdowns() {
-            const statusDropdowns = [document.getElementById('newOwnerStatus'), document.getElementById('filterStatus')];
-            statusDropdowns.forEach(dropdown => {
-                if(dropdown.id === 'filterStatus') dropdown.innerHTML = '<option value="">All Statuses</option>';
-                else dropdown.innerHTML = '';
+            const dropdowns = [
+                { id: 'newOwnerStatus', default: '' },
+                { id: 'filterStatus', default: 'All Statuses' }
+            ];
+
+            dropdowns.forEach(d => {
+                const select = document.getElementById(d.id);
+                if (!select) return;
+
+                select.innerHTML = d.default ? `<option value="">${d.default}</option>` : '';
+
                 for (const status in STATUS_OPTIONS) {
                     const option = document.createElement('option');
                     option.value = status;
                     option.textContent = status;
-                    dropdown.appendChild(option);
+                    option.style.color = STATUS_OPTIONS[status];
+                    select.appendChild(option);
                 }
             });
         }
@@ -2200,11 +2209,11 @@
             const newRow = document.createElement('tr');
             newRow.innerHTML = `
                 <td>
-                    <input type="text" class="form-input" placeholder="Label (e.g., Mobile)"
+                    <input type="text" class="form-input highlight-yellow" placeholder="Label (e.g., Mobile)"
                         onchange="updateOwner('phone_label_${nextIndex}', this.value)">
                 </td>
                 <td>
-                    <input type="text" class="form-input" placeholder="Number"
+                    <input type="text" class="form-input highlight-yellow" placeholder="Number"
                         onchange="updateOwner('phone_number_${nextIndex}', this.value)">
                 </td>
                 <td style="text-align: center;">
