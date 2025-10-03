@@ -1820,6 +1820,7 @@
                 const index = allProperties.findIndex(p => p.id === currentProperty.id);
                 if (index !== -1) allProperties[index][field] = value;
 
+                applyFiltersAndSearch(); // Refresh owner list to reflect potential filter changes
                 await renderCenterPanel();
             } catch (error) {
                 console.error('Error updating property:', error);
@@ -1890,7 +1891,7 @@
                 if (index !== -1) Object.assign(allOwners[index], data[0]);
 
                 if (field === 'marker_pin' || field === 'status_tags') {
-                    renderOwnersList();
+                    applyFiltersAndSearch(); // Use filtering to preserve view
                 }
 
                 await renderCenterPanel();
@@ -1908,8 +1909,12 @@
 
         // Render Communication Logs
         function renderCommunicationLogs() {
-            if (!currentOwner) return;
             const logList = document.getElementById('logList');
+            if (!currentOwner) {
+                logList.innerHTML = '<div class="no-logs">No communication history</div>';
+                document.getElementById('logPropertyName').textContent = 'Select a property';
+                return;
+            }
             const ownerLogs = allLogs.filter(log => log.owner_id === currentOwner.id).sort((a,b) => new Date(b.date) - new Date(a.date));
 
             if (ownerLogs.length === 0) {
@@ -1969,6 +1974,7 @@
                 } else {
                     currentProperty = null;
                 }
+                applyFiltersAndSearch(); // Refresh owner list to update property counts
                 await renderCenterPanel();
             } catch (error) {
                 console.error('Error deleting property:', error);
@@ -2147,7 +2153,7 @@
                 if (error) throw error;
 
                 allOwners.push(data[0]);
-                renderOwnersList();
+                applyFiltersAndSearch(); // Use filtering to preserve view
 
                 closeModal('addOwnerModal');
 
@@ -2187,6 +2193,7 @@
                 if (error) throw error;
 
                 allProperties.push(data[0]);
+                applyFiltersAndSearch(); // Refresh the owner list to update property counts
 
                 // If currently viewed owner is the one we added to, refresh their view
                 if (currentOwner && currentOwner.id === ownerId) {
@@ -2610,15 +2617,30 @@
                 return;
             }
 
-            try {
-                // This should ideally be a transaction in a real-world scenario
-                await supabase.from('communication_logs').delete().eq('owner_id', currentOwner.id);
-                await supabase.from('properties').delete().eq('owner_id', currentOwner.id);
-                await supabase.from('owners').delete().eq('id', currentOwner.id);
+            const ownerIdToDelete = currentOwner.id;
 
-                window.location.reload(); // Simple way to refresh state
+            try {
+                // This should ideally be a transaction
+                await supabase.from('communication_logs').delete().eq('owner_id', ownerIdToDelete);
+                await supabase.from('properties').delete().eq('owner_id', ownerIdToDelete);
+                await supabase.from('owners').delete().eq('id', ownerIdToDelete);
+
+                // Update local state
+                allOwners = allOwners.filter(o => o.id !== ownerIdToDelete);
+                allProperties = allProperties.filter(p => p.owner_id !== ownerIdToDelete);
+                allLogs = allLogs.filter(l => l.owner_id !== ownerIdToDelete);
+
+                currentOwner = null;
+                currentProperty = null;
+
+                // Refresh UI without reloading the page
+                applyFiltersAndSearch();
+                renderCenterPanel(); // Will show "Select an owner" and clear map
+                renderCommunicationLogs(); // Will show "No history"
+
             } catch (error) {
                 console.error('Error deleting owner:', error);
+                alert('Failed to delete owner.');
             }
         }
 
@@ -2633,16 +2655,37 @@
             if (!newOwnerId) return;
 
             const oldOwnerId = currentOwner.id;
-
-            // Reassign owner_id and owner_name for the property
             const newOwner = allOwners.find(o => o.id === newOwnerId);
-            await updateProperty('owner_id', newOwnerId);
-            await updateProperty('owner_name', newOwner.owner_name);
+            if (!newOwner) return; // Should not happen if search is working
 
-            closeModal('transferPropertyModal');
+            try {
+                // 1. Update database
+                const { error } = await supabase
+                    .from('properties')
+                    .update({ owner_id: newOwnerId, owner_name: newOwner.owner_name })
+                    .eq('id', currentProperty.id);
 
-            // Refresh the old owner's view (property will be gone)
-            await selectOwner(oldOwnerId);
+                if (error) throw error;
+
+                // 2. Update local state (the master list of properties)
+                const propInAll = allProperties.find(p => p.id === currentProperty.id);
+                if (propInAll) {
+                    propInAll.owner_id = newOwnerId;
+                    propInAll.owner_name = newOwner.owner_name;
+                }
+
+                closeModal('transferPropertyModal');
+
+                // 3. Refresh UI
+                // First, refresh the owner list on the left to show correct property counts
+                applyFiltersAndSearch();
+                // Then, re-select the original owner to update the center panel
+                await selectOwner(oldOwnerId);
+
+            } catch (error) {
+                console.error('Error transferring property:', error);
+                alert('Failed to transfer property.');
+            }
         }
 
         function addPhoneRow() {
