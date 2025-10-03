@@ -1358,7 +1358,7 @@
                         </div>
                     </div>
                     <div class="property-images">
-                         <div class="image-container">
+                        <div class="image-container">
                             ${currentProperty.image_url_1 ? `<img src="${currentProperty.image_url_1}" alt="Property Image 1">` : 'Click + to add'}
                             <div class="image-actions">
                                 <button onclick="showEditModal('property', 'image_url_1', 'Edit Image URL 1', 'Image URL', currentProperty.image_url_1)">➕</button>
@@ -1399,6 +1399,37 @@
                         <div class="form-group full-width">
                             <label class="form-label">Property Name</label>
                             <input type="text" class="form-input ${highlightField(currentProperty.property_name)}" value="${currentProperty.property_name || ''}" onchange="updateProperty('property_name', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.city)}" value="${currentProperty.city || ''}" onchange="updateProperty('city', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">State</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.state)}" value="${currentProperty.state || ''}" onchange="updateProperty('state', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">ZIP</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.zip)}" value="${currentProperty.zip || ''}" onchange="updateProperty('zip', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Year Built</label>
+                            <input type="number" class="form-input ${highlightField(currentProperty.built)}" value="${currentProperty.built || ''}" onchange="updateProperty('built', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Submarket</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.submarket)}" value="${currentProperty.submarket || ''}" onchange="updateProperty('submarket', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Location</label>
+                            <select class="form-input ${highlightField(currentProperty.location)}" onchange="updateProperty('location', this.value)">
+                                <option value="">Select...</option>
+                                <option value="SE Portland" ${currentProperty.location === 'SE Portland' ? 'selected' : ''}>SE Portland</option>
+                                <option value="NE Portland" ${currentProperty.location === 'NE Portland' ? 'selected' : ''}>NE Portland</option>
+                                <option value="NW Portland" ${currentProperty.location === 'NW Portland' ? 'selected' : ''}>NW Portland</option>
+                                <option value="SW Portland" ${currentProperty.location === 'SW Portland' ? 'selected' : ''}>SW Portland</option>
+                                <option value="N Portland" ${currentProperty.location === 'N Portland' ? 'selected' : ''}>N Portland</option>
+                            </select>
                         </div>
                     </div>
                 `;
@@ -1726,7 +1757,6 @@
                 alert('Please select an owner first');
                 return;
             }
-            document.getElementById('newLogDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('addLogModal').classList.add('active');
         }
 
