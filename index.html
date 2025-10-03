@@ -1209,6 +1209,9 @@
             currentOwner = allOwners.find(o => o.id === ownerId);
             if (!currentOwner) return;
 
+            // Attach logs to the owner object
+            currentOwner.logs = allLogs.filter(log => log.owner_id === currentOwner.id);
+
             // Highlight selected owner
             document.querySelectorAll('.owner-item').forEach(item => item.classList.remove('active'));
             const activeItem = Array.from(document.querySelectorAll('.owner-item')).find(el => el.getAttribute('onclick') === `selectOwner('${ownerId}')`);
@@ -1421,15 +1424,28 @@
                             <input type="text" class="form-input ${highlightField(currentProperty.submarket)}" value="${currentProperty.submarket || ''}" onchange="updateProperty('submarket', this.value)">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Location</label>
-                            <select class="form-input ${highlightField(currentProperty.location)}" onchange="updateProperty('location', this.value)">
-                                <option value="">Select...</option>
-                                <option value="SE Portland" ${currentProperty.location === 'SE Portland' ? 'selected' : ''}>SE Portland</option>
-                                <option value="NE Portland" ${currentProperty.location === 'NE Portland' ? 'selected' : ''}>NE Portland</option>
-                                <option value="NW Portland" ${currentProperty.location === 'NW Portland' ? 'selected' : ''}>NW Portland</option>
-                                <option value="SW Portland" ${currentProperty.location === 'SW Portland' ? 'selected' : ''}>SW Portland</option>
-                                <option value="N Portland" ${currentProperty.location === 'N Portland' ? 'selected' : ''}>N Portland</option>
-                            </select>
+                            <label class="form-label">Units</label>
+                            <input type="number" class="form-input ${highlightField(currentProperty.units)}" value="${currentProperty.units || ''}" onchange="updateProperty('units', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Parcel #</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.parcel_number)}" value="${currentProperty.parcel_number || ''}" onchange="updateProperty('parcel_number', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">CoStar #</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.costar_number)}" value="${currentProperty.costar_number || ''}" onchange="updateProperty('costar_number', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Property ID</label>
+                            <input type="text" class="form-input ${highlightField(currentProperty.property_id)}" value="${currentProperty.property_id || ''}" onchange="updateProperty('property_id', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">First Meeting</label>
+                            <input type="date" class="form-input" value="${currentProperty.first_meeting || ''}" onchange="updateProperty('first_meeting', this.value)">
+                        </div>
+                         <div class="form-group">
+                            <label class="form-label">Proposal</label>
+                            <input type="checkbox" ${currentProperty.proposal ? 'checked' : ''} onchange="updateProperty('proposal', this.checked)">
                         </div>
                     </div>
                 `;
@@ -1475,11 +1491,9 @@
                 </table>
                 <button class="btn add-phone-btn" onclick="addPhoneRow()">+ Add Phone</button>
                 <div class="cell-only-row">
-                    <label><input type="checkbox" ${currentOwner.call_with_cell_only ? 'checked' : ''}
-                        onchange="updateOwner('call_with_cell_only', this.checked)"> Call with cell only</label>
+                    <label><input type="checkbox" ${currentOwner.call_with_cell_only ? 'checked' : ''} onchange="updateOwner('call_with_cell_only', this.checked)"> Call with cell only</label>
                 </div>
-
-                <div style="display: none;">
+                 <div style="display: none;">
                     <div class="section-title" style="margin-top: 30px;">Status Tags</div>
                     <div id="ownerStatusTags" class="status-tags-container"></div>
                 </div>
