@@ -275,6 +275,16 @@
             color: white;
         }
 
+        .link-btn.linkedin {
+            background: #0077b5;
+            color: white;
+        }
+
+        .link-btn.website {
+            background: #f0f0f0;
+            color: #333;
+        }
+
         .property-images {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -332,7 +342,7 @@
 
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 15px;
         }
@@ -1459,15 +1469,62 @@
                         <label class="form-label">Next Follow-Up</label>
                         <input type="date" class="form-input ${highlightField(currentOwner.next_follow_up)}" value="${currentOwner.next_follow_up || ''}" onchange="updateOwner('next_follow_up', this.value)">
                     </div>
-                     <div class="form-group">
+                     <div class="form-group full-width">
                         <label class="form-label">Owner Address</label>
                         <input type="text" class="form-input ${highlightField(currentOwner.owner_address)}" value="${currentOwner.owner_address || ''}" onchange="updateOwner('owner_address', this.value)">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group full-width">
                         <label class="form-label">Owner Email</label>
                         <input type="email" class="form-input ${highlightField(currentOwner.owner_email)}" value="${currentOwner.owner_email || ''}" onchange="updateOwner('owner_email', this.value)">
                     </div>
                 </div>
+
+                <div class="link-buttons" style="margin-top: 15px; margin-bottom: 15px; justify-content: center; gap: 20px;">
+                    <div class="link-btn-group" style="flex-grow: 0; flex-basis: 200px;">
+                        <a href="${currentOwner.linkedin || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentOwner.linkedin ? 'linkedin' : 'no-link'}">LinkedIn</a>
+                        <button class="link-action-btn" onclick="showEditModal('owner', 'linkedin', 'Edit LinkedIn URL', 'URL', currentOwner.linkedin || '')">➕</button>
+                        ${currentOwner.linkedin ? `<button class="link-action-btn" onclick="updateOwner('linkedin', null)">❌</button>` : ''}
+                    </div>
+                    <div class="link-btn-group" style="flex-grow: 0; flex-basis: 200px;">
+                        <a href="${currentOwner.website || 'javascript:void(0)'}" target="_blank" class="link-btn ${currentOwner.website ? 'website' : 'no-link'}">Website</a>
+                        <button class="link-action-btn" onclick="showEditModal('owner', 'website', 'Edit Website URL', 'URL', currentOwner.website || '')">➕</button>
+                        ${currentOwner.website ? `<button class="link-action-btn" onclick="updateOwner('website', null)">❌</button>` : ''}
+                    </div>
+                </div>
+
+                <div class="form-grid" style="grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label class="form-label">Objection</label>
+                        <input type="text" class="form-input ${highlightField(currentOwner.objection)}" value="${currentOwner.objection || ''}" onchange="updateOwner('objection', this.value)">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label class="form-label">Opportunity</label>
+                        <input type="text" class="form-input ${highlightField(currentOwner.opportunity)}" value="${currentOwner.opportunity || ''}" onchange="updateOwner('opportunity', this.value)">
+                    </div>
+                     <div class="form-group">
+                        <label class="form-label">Birth Year</label>
+                        <input type="number" class="form-input" value="${currentOwner.birth_year || ''}" onchange="updateOwner('birth_year', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Birth Month</label>
+                        <select class="form-input" onchange="updateOwner('birth_month', this.value)">
+                            <option value="" ${!currentOwner.birth_month ? 'selected' : ''}>Select Month</option>
+                            ${[
+                                'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                            ].map((month, i) => `<option value="${i + 1}" ${currentOwner.birth_month == (i + 1) ? 'selected' : ''}>${month}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Age</label>
+                        <input type="number" class="form-input" value="${currentOwner.age || ''}" onchange="updateOwner('age', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Hobbies / Interests</label>
+                        <input type="text" class="form-input" value="${currentOwner.hobbies_interests || ''}" onchange="updateOwner('hobbies_interests', this.value)">
+                    </div>
+                </div>
+
                 <div class="section-title" style="margin-top: 30px;">Phone Numbers</div>
                 <table class="phone-table">
                     <thead>
@@ -1625,6 +1682,73 @@
                     <div class="form-group">
                         <label class="form-label">Latitude</label>
                         <input type="text" class="form-input ${highlightField(currentProperty.latt)}" value="${currentProperty.latt || ''}" onchange="updateProperty('latt', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Property Type</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.property_type)}" value="${currentProperty.property_type || ''}" onchange="updateProperty('property_type', this.value)">
+                    </div>
+                </div>
+
+                <div class="section-title" style="margin-top: 30px;">Sale Information</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">For Sale Status</label>
+                        <select class="form-input" onchange="updateProperty('for_sale_status', this.value)" style="color: ${currentProperty.for_sale_status === 'Y' ? '#e67e22' : '#6c757d'}">
+                            <option value="N" ${currentProperty.for_sale_status === 'N' ? 'selected' : ''} style="color: #6c757d;">No</option>
+                            <option value="Y" ${currentProperty.for_sale_status === 'Y' ? 'selected' : ''} style="color: #e67e22;">Yes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Day Listed</label>
+                        <input type="date" class="form-input" value="${currentProperty.day_listed || ''}" onchange="updateProperty('day_listed', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">For Sale Price</label>
+                        <input type="number" class="form-input" value="${currentProperty.for_sale_price || ''}" onchange="updateProperty('for_sale_price', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Sale Price</label>
+                        <input type="number" class="form-input" value="${currentProperty.last_sale_price || ''}" onchange="updateProperty('last_sale_price', this.value)">
+                    </div>
+                     <div class="form-group">
+                        <label class="form-label">Last Sale Date</label>
+                        <input type="date" class="form-input" value="${currentProperty.last_sale_date || ''}" onchange="updateProperty('last_sale_date', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">County</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.county_name)}" value="${currentProperty.county_name || ''}" onchange="updateProperty('county_name', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Zoning</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.zoning)}" value="${currentProperty.zoning || ''}" onchange="updateProperty('zoning', this.value)">
+                    </div>
+                     <div class="form-group">
+                        <label class="form-label">Property Manager</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.property_manager_name)}" value="${currentProperty.property_manager_name || ''}" onchange="updateProperty('property_manager_name', this.value)">
+                    </div>
+                </div>
+
+                <div class="section-title" style="margin-top: 30px;">Loan Information</div>
+                 <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Interest Rate</label>
+                        <input type="number" class="form-input" value="${currentProperty.interest_rate || ''}" onchange="updateProperty('interest_rate', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Loan Type</label>
+                        <input type="text" class="form-input ${highlightField(currentProperty.loan_type)}" value="${currentProperty.loan_type || ''}" onchange="updateProperty('loan_type', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Maturity Date</label>
+                        <input type="date" class="form-input" value="${currentProperty.maturity_date || ''}" onchange="updateProperty('maturity_date', this.value)">
+                    </div>
+                     <div class="form-group">
+                        <label class="form-label">Land Area (SF)</label>
+                        <input type="number" class="form-input" value="${currentProperty.land_area_sf || ''}" onchange="updateProperty('land_area_sf', this.value)">
+                    </div>
+                     <div class="form-group">
+                        <label class="form-label">Land Area (AC)</label>
+                        <input type="number" class="form-input" value="${currentProperty.land_area_ac || ''}" onchange="updateProperty('land_area_ac', this.value)">
                     </div>
                 </div>
             `;
