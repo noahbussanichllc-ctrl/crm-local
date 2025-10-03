@@ -1064,10 +1064,6 @@
         let marker = null;
 
         // Performance-related state
-        let ownerListPage = 0;
-        const ownerListPageSize = 100;
-        let isLoadingOwners = false;
-        let allOwnersLoaded = false;
         let searchDebounceTimer;
 
         const STATUS_OPTIONS = {
@@ -1090,22 +1086,10 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
             initMap();
-            await loadInitialData();
+            await loadAllData();
             setTodayDate();
             populateStatusDropdowns();
             renderFilterTags();
-            await populateFilterDropdowns(); // Populate new dynamic filters
-            await loadFollowUpTasks(); // Load initial follow-up tasks
-
-            // Add scroll listener for infinite scrolling
-            const ownersListEl = document.getElementById('ownersList');
-            ownersListEl.addEventListener('scroll', () => {
-                if (ownersListEl.scrollTop + ownersListEl.clientHeight >= ownersListEl.scrollHeight - 100) {
-                    if (!isLoadingOwners && !allOwnersLoaded) {
-                        fetchAndRenderOwners();
-                    }
-                }
-            });
         });
 
         // Initialize Map
@@ -1122,13 +1106,31 @@
             document.getElementById('datePicker').value = today;
         }
 
-        // Load Initial Data
-        async function loadInitialData() {
-            ownerListPage = 0;
-            allOwnersLoaded = false;
-            allOwners = [];
-            document.getElementById('ownersList').innerHTML = '<div class="loading">Loading owners...</div>';
-            await fetchAndRenderOwners();
+        // Load All Data from Supabase
+        async function loadAllData() {
+            try {
+                const { data: owners, error: ownersError } = await supabase.from('owners').select('*');
+                if (ownersError) throw ownersError;
+                allOwners = owners;
+
+                const { data: properties, error: propertiesError } = await supabase.from('properties').select('*');
+                if (propertiesError) throw propertiesError;
+                allProperties = properties;
+
+                const { data: logs, error: logsError } = await supabase.from('communication_logs').select('*');
+                if (logsError) throw logsError;
+                allLogs = logs;
+
+                console.log(`Loaded ${allOwners.length} owners, ${allProperties.length} properties, and ${allLogs.length} logs`);
+
+                renderOwnersList();
+                populateOwnerSelect();
+                populateFilterDropdowns();
+                loadFollowUpTasks();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Error loading data from Supabase. Please refresh the page.');
+            }
         }
 
         // Render/Append Owners List
@@ -1157,20 +1159,18 @@
                 loadingDiv.remove();
             }
 
-            ownerCount.textContent = allOwners.length; // Show total loaded count
+            ownerCount.textContent = owners.length;
 
             const html = owners.map(owner => {
-                // We don't have property counts initially, so we can't show them.
-                // This can be fetched on select, or we can do a separate count query.
-                // For now, let's omit it for performance.
+                const propertyCount = allProperties.filter(p => p.owner_id === owner.id).length;
                 const statusColor = STATUS_OPTIONS[owner.marker_pin] || '#6c757d';
 
                 return `
-                    <div class="owner-item" id="owner-item-${owner.id}" onclick="selectOwner('${owner.id}')">
+                    <div class="owner-item" onclick="selectOwner('${owner.id}')">
                         <div class="owner-status-dot" style="background-color: ${statusColor}"></div>
                         <div class="owner-info">
                             <div class="owner-name">${owner.owner_name || 'Unnamed Owner'}</div>
-                            <div class="owner-properties" id="prop-count-${owner.id}"></div>
+                            <div class="owner-properties">${propertyCount} ${propertyCount === 1 ? 'Property' : 'Properties'}</div>
                         </div>
                     </div>
                 `;
@@ -1179,57 +1179,28 @@
             ownersList.insertAdjacentHTML('beforeend', html);
         }
 
-        // Select Owner (On-Demand Loading)
+        // Select Owner
         async function selectOwner(ownerId) {
             currentOwner = allOwners.find(o => o.id === ownerId);
             if (!currentOwner) return;
 
             // Highlight selected owner
             document.querySelectorAll('.owner-item').forEach(item => item.classList.remove('active'));
-            const activeItem = document.getElementById(`owner-item-${ownerId}`);
+            const activeItem = Array.from(document.querySelectorAll('.owner-item')).find(el => el.getAttribute('onclick') === `selectOwner('${ownerId}')`);
             if (activeItem) activeItem.classList.add('active');
 
-            // Show loading state in center panel
-            document.getElementById('centerPanel').innerHTML = '<div class="loading">Loading properties...</div>';
+            // Get owner's properties from the global array
+            ownerProperties = allProperties.filter(p => p.owner_id === ownerId);
+            currentPropertyIndex = 0;
 
-            try {
-                // Fetch properties for the selected owner
-                const { data: properties, error: propertiesError } = await supabase
-                    .from('properties')
-                    .select('*')
-                    .eq('owner_id', ownerId);
-                if (propertiesError) throw propertiesError;
-                ownerProperties = properties;
-
-                // Update property count in the side panel
-                const propCountEl = document.getElementById(`prop-count-${ownerId}`);
-                if (propCountEl) {
-                    propCountEl.textContent = `${ownerProperties.length} ${ownerProperties.length === 1 ? 'Property' : 'Properties'}`;
-                }
-
-                // Fetch communication logs for the selected owner
-                const { data: logs, error: logsError } = await supabase
-                    .from('communication_logs')
-                    .select('*')
-                    .eq('owner_id', ownerId)
-                    .order('date', { ascending: false });
-                if (logsError) throw logsError;
-                currentOwner.logs = logs; // Attach logs to the owner object
-
-                currentPropertyIndex = 0;
-                if (ownerProperties.length > 0) {
-                    currentProperty = ownerProperties[0];
-                    await renderPropertyDetails();
-                    renderCommunicationLogs();
-                } else {
-                    renderNoProperties();
-                    // Still render logs even if no properties
-                    renderCommunicationLogs();
-                }
-            } catch (error) {
-                console.error('Error loading owner details:', error);
-                document.getElementById('centerPanel').innerHTML = `<div class="loading">Error loading details.</div>`;
+            if (ownerProperties.length > 0) {
+                currentProperty = ownerProperties[0];
+                await renderPropertyDetails();
+            } else {
+                renderNoProperties();
             }
+            // Always render communication logs
+            renderCommunicationLogs();
         }
 
         // Load and Render Follow-Up Tasks
@@ -1546,7 +1517,6 @@
                 currentPropertyIndex--;
                 currentProperty = ownerProperties[currentPropertyIndex];
                 renderPropertyDetails();
-                loadCommunicationLogs();
             }
         }
 
@@ -1555,7 +1525,6 @@
                 currentPropertyIndex++;
                 currentProperty = ownerProperties[currentPropertyIndex];
                 renderPropertyDetails();
-                loadCommunicationLogs();
             }
         }
 
@@ -1613,8 +1582,8 @@
             }
         }
 
-        // Load Communication Logs
-        async function loadCommunicationLogs() {
+        // Render Communication Logs
+        function renderCommunicationLogs() {
             if (!currentOwner) return;
             const logList = document.getElementById('logList');
             const ownerLogs = allLogs.filter(log => log.owner_id === currentOwner.id).sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -1934,161 +1903,85 @@
                 allOwners.map(owner => `<option value="${owner.id}">${owner.owner_name}</option>`).join('');
         }
 
-        // Populate Filter Dropdowns with distinct values from the DB
-        async function populateFilterDropdowns() {
-            /*
-            NOTE: This requires a PostgreSQL function in your Supabase project for efficiency.
-            Use the following SQL to create it:
+        // Populate Filter Dropdowns with distinct values
+        function populateFilterDropdowns() {
+            const populate = (id, items, defaultOption) => {
+                const select = document.getElementById(id);
+                const uniqueItems = [...new Set(items.filter(item => item))].sort();
+                select.innerHTML = `<option value="">${defaultOption}</option>` +
+                    uniqueItems.map(item => `<option value="${item}">${item}</option>`).join('');
+            };
 
-            create function get_distinct_filter_values()
-            returns json
-            as $$
-            select json_build_object(
-                'locations', (select json_agg(distinct location) from properties where location is not null),
-                'cities', (select json_agg(distinct city) from properties where city is not null),
-                'submarkets', (select json_agg(distinct submarket) from properties where submarket is not null),
-                'zips', (select json_agg(distinct zip) from properties where zip is not null)
-            );
-            $$ language sql;
+            const locations = allProperties.map(p => p.location);
+            populate('filterLocation', locations, 'All Locations');
 
-            */
-            try {
-                const { data, error } = await supabase.rpc('get_distinct_filter_values');
-                if (error) throw error;
+            const cities = allProperties.map(p => p.city);
+            populate('filterCity', cities, 'All Cities');
 
-                const { locations, cities, submarkets, zips } = data;
+            const submarkets = allProperties.map(p => p.submarket);
+            populate('filterSubmarket', submarkets, 'All Submarkets');
 
-                const populate = (id, items, defaultOption) => {
-                    const select = document.getElementById(id);
-                    select.innerHTML = `<option value="">${defaultOption}</option>` +
-                        items.sort().map(item => `<option value="${item}">${item}</option>`).join('');
-                };
+            const zips = allProperties.map(p => p.zip);
+            populate('filterZip', zips, 'All Zips');
 
-                populate('filterLocation', locations || [], 'All Locations');
-                populate('filterCity', cities || [], 'All Cities');
-                populate('filterSubmarket', submarkets || [], 'All Submarkets');
-                populate('filterZip', zips || [], 'All Zips');
-
-            } catch (error) {
-                console.error('Error populating filter dropdowns:', error);
-                // Add user-facing error message?
-            }
+            const statuses = allOwners.map(o => o.marker_pin);
+            populate('filterStatus', statuses, 'All Statuses');
         }
 
-        // Search and Filter (Server-Side)
-        function applyFiltersAndSearch(isNewSearch = false) {
-            if (isNewSearch) {
-                ownerListPage = 0;
-                allOwnersLoaded = false;
-                allOwners = [];
-                document.getElementById('ownersList').innerHTML = ''; // Clear previous results
-            }
-            fetchAndRenderOwners();
-        }
-
-        async function fetchAndRenderOwners() {
-            if (isLoadingOwners || allOwnersLoaded) return;
-            isLoadingOwners = true;
-
+        // Search and Filter (Client-Side)
+        function applyFiltersAndSearch() {
+            let filteredOwners = [...allOwners];
             const query = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            // Filter logic
             const location = document.getElementById('filterLocation').value;
-            const city = document.getElementById('filterCity').value.toLowerCase();
-            const submarket = document.getElementById('filterSubmarket').value.toLowerCase();
+            const city = document.getElementById('filterCity').value;
+            const submarket = document.getElementById('filterSubmarket').value;
             const zip = document.getElementById('filterZip').value;
             const yearMin = document.getElementById('filterYearMin').value;
             const yearMax = document.getElementById('filterYearMax').value;
             const unitsMin = document.getElementById('filterUnitsMin').value;
             const unitsMax = document.getElementById('filterUnitsMax').value;
             const status = document.getElementById('filterStatus').value;
-            const activeTags = Array.from(document.querySelectorAll('#filterStatusTags .active')).map(tag => tag.dataset.tag);
 
             const hasPropertyFilters = [location, city, submarket, zip, yearMin, yearMax, unitsMin, unitsMax].some(f => f);
 
-            try {
-                let owners;
-                // If there's a search query or property filter, we need a more complex query.
-                if (query || hasPropertyFilters) {
-                    /*
-                    NOTE FOR PRODUCTION: The following client-side join is not optimal.
-                    It fetches all matching property IDs first, then makes a second query to fetch the owners.
-                    For a production environment, this should be replaced with a single, efficient RPC function
-                    in Supabase that performs the join and filtering on the database server.
-                    Example RPC: `search_and_filter_owners(search_query, filter_params)`
-                    */
-                    let propertyQuery = supabase.from('properties').select('owner_id');
-                    if (location) propertyQuery = propertyQuery.eq('location', location);
-                    if (city) propertyQuery = propertyQuery.ilike('city', `%${city}%`);
-                    if (submarket) propertyQuery = propertyQuery.ilike('submarket', `%${submarket}%`);
-                    if (zip) propertyQuery = propertyQuery.eq('zip', zip);
-                    if (yearMin) propertyQuery = propertyQuery.gte('built', yearMin);
-                    if (yearMax) propertyQuery = propertyQuery.lte('built', yearMax);
-                    if (unitsMin) propertyQuery = propertyQuery.gte('units', unitsMin);
-                    if (unitsMax) propertyQuery = propertyQuery.lte('units', unitsMax);
-                    if (query) propertyQuery = propertyQuery.ilike('address', `%${query}%`);
-
-                    const { data: properties, error: pError } = await propertyQuery;
-                    if (pError) throw pError;
-                    const ownerIdsFromProperties = [...new Set(properties.map(p => p.owner_id))];
-
-                    let ownerQuery = supabase.from('owners').select('*');
-                    if (query) {
-                        // Creates an OR condition for owner name or owner ID from property search
-                        const orConditions = [`owner_name.ilike.%${query}%`];
-                        if (ownerIdsFromProperties.length > 0) {
-                            orConditions.push(`id.in.(${ownerIdsFromProperties.join(',')})`);
-                        }
-                        ownerQuery = ownerQuery.or(orConditions.join(','));
-                    } else if (hasPropertyFilters) {
-                         if (ownerIdsFromProperties.length > 0) {
-                            ownerQuery = ownerQuery.in('id', ownerIdsFromProperties);
-                        } else {
-                            // If property filters match nothing, no owners should be returned.
-                            ownerQuery = ownerQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // No-op
-                        }
-                    }
-
-                    if (status) ownerQuery = ownerQuery.eq('marker_pin', status);
-                    if (activeTags.length > 0) ownerQuery = ownerQuery.contains('status_tags', activeTags);
-
-                    const { data: ownerData, error: oError } = await ownerQuery.range(ownerListPage * ownerListPageSize, (ownerListPage + 1) * ownerListPageSize - 1);
-                    if (oError) throw oError;
-                    owners = ownerData;
-
-                } else {
-                    // Simple query with only owner filters
-                    let ownerQuery = supabase.from('owners').select('*');
-                    if (status) ownerQuery = ownerQuery.eq('marker_pin', status);
-                    if (activeTags.length > 0) ownerQuery = ownerQuery.contains('status_tags', activeTags);
-
-                    const { data: ownerData, error: oError } = await ownerQuery.range(ownerListPage * ownerListPageSize, (ownerListPage + 1) * ownerListPageSize - 1);
-                    if(oError) throw oError;
-                    owners = ownerData;
-                }
-
-                if (owners.length < ownerListPageSize) {
-                    allOwnersLoaded = true;
-                }
-
-                allOwners.push(...owners);
-                ownerListPage++;
-                appendOwnersToList(owners);
-
-                if(allOwners.length === 0) {
-                     document.getElementById('ownersList').innerHTML = '<div class="loading">No owners found matching criteria.</div>';
-                }
-
-            } catch (error) {
-                console.error("Error fetching owners:", error);
-                 document.getElementById('ownersList').innerHTML = '<div class="loading">Error fetching owners.</div>';
-            } finally {
-                isLoadingOwners = false;
+            if (status) {
+                filteredOwners = filteredOwners.filter(owner => owner.marker_pin === status);
             }
+
+            if (hasPropertyFilters) {
+                const matchingOwnerIds = new Set(allProperties.filter(p => {
+                    if (location && p.location !== location) return false;
+                    if (city && p.city !== city) return false;
+                    if (submarket && p.submarket !== submarket) return false;
+                    if (zip && p.zip != zip) return false;
+                    if (yearMin && p.built < yearMin) return false;
+                    if (yearMax && p.built > yearMax) return false;
+                    if (unitsMin && p.units < unitsMin) return false;
+                    if (unitsMax && p.units > unitsMax) return false;
+                    return true;
+                }).map(p => p.owner_id));
+
+                filteredOwners = filteredOwners.filter(owner => matchingOwnerIds.has(owner.id));
+            }
+
+            // Search logic
+            if (query) {
+                const propertyOwnerIds = new Set(allProperties.filter(p => (p.address || '').toLowerCase().includes(query)).map(p => p.owner_id));
+                filteredOwners = filteredOwners.filter(owner => {
+                    const nameMatch = (owner.owner_name || '').toLowerCase().includes(query);
+                    return nameMatch || propertyOwnerIds.has(owner.id);
+                });
+            }
+
+            renderOwnersList(filteredOwners);
         }
 
         function performSearch() {
             clearTimeout(searchDebounceTimer);
             searchDebounceTimer = setTimeout(() => {
-                applyFiltersAndSearch(true); // Pass true to indicate it's a search, not just a filter change
+                applyFiltersAndSearch();
             }, 250); // 250ms debounce delay
         }
 
@@ -2100,7 +1993,7 @@
 
         // Apply Filters
         function applyFilters() {
-            applyFiltersAndSearch(true); // Treat filter changes as a new search
+            applyFiltersAndSearch();
         }
 
         // Clear Filters
@@ -2116,74 +2009,53 @@
             document.getElementById('filterUnitsMax').value = '';
             document.getElementById('filterStatus').value = '';
             document.querySelectorAll('#filterStatusTags .active').forEach(tag => tag.classList.remove('active'));
-            applyFiltersAndSearch(true); // Reset and fetch
+            applyFiltersAndSearch();
         }
 
-        // Show Status Breakdown (using RPC for performance)
-        async function showStatusBreakdown() {
+        // Show Status Breakdown
+        function showStatusBreakdown() {
+            const statusCounts = {};
+            allOwners.forEach(owner => {
+                const status = owner.marker_pin || 'Unspecified';
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+            });
+
             document.getElementById('statusModal').classList.add('active');
 
-            try {
-                /*
-                NOTE: This requires a PostgreSQL function in your Supabase project.
-                Use the following SQL to create it:
+            const ctx = document.getElementById('statusChart').getContext('2d');
 
-                create function get_status_breakdown()
-                returns table(marker_pin text, count bigint)
-                as $$
-                  select marker_pin, count(id) from owners group by marker_pin;
-                $$ language sql;
+            if(window.statusChartInstance) {
+                window.statusChartInstance.destroy();
+            }
 
-                */
-                const { data, error } = await supabase.rpc('get_status_breakdown');
-                if (error) throw error;
-
-                const statusCounts = data.reduce((acc, item) => {
-                    acc[item.marker_pin || 'Unspecified'] = item.count;
-                    return acc;
-                }, {});
-
-                const totalOwners = data.reduce((sum, item) => sum + item.count, 0);
-
-                const ctx = document.getElementById('statusChart').getContext('2d');
-
-                if(window.statusChartInstance) {
-                    window.statusChartInstance.destroy();
-                }
-
-                window.statusChartInstance = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: Object.keys(statusCounts),
-                        datasets: [{
-                            data: Object.values(statusCounts),
-                            backgroundColor: Object.keys(statusCounts).map(status => STATUS_OPTIONS[status] || '#6c757d')
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            }
+            window.statusChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: Object.keys(statusCounts).map(status => STATUS_OPTIONS[status] || '#6c757d')
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
                         }
                     }
-                });
+                }
+            });
 
-                const stats = Object.entries(statusCounts)
-                    .map(([status, count]) => {
-                        const percentage = totalOwners > 0 ? ((count / totalOwners) * 100).toFixed(1) : 0;
-                        return `<div style="padding: 10px; background: #f8f9fa; margin-bottom: 5px; border-radius: 4px;">
-                            <strong>${status}:</strong> ${count} owners (${percentage}%)
-                        </div>`;
-                    }).join('');
+            const stats = Object.entries(statusCounts)
+                .map(([status, count]) => {
+                    const percentage = ((count / allOwners.length) * 100).toFixed(1);
+                    return `<div style="padding: 10px; background: #f8f9fa; margin-bottom: 5px; border-radius: 4px;">
+                        <strong>${status}:</strong> ${count} owners (${percentage}%)
+                    </div>`;
+                }).join('');
 
-                document.getElementById('statusStats').innerHTML = stats;
-
-            } catch (error) {
-                console.error("Error fetching status breakdown:", error);
-                document.getElementById('statusStats').innerHTML = '<div class="loading">Could not load status breakdown. Make sure the `get_status_breakdown` RPC is set up in Supabase.</div>';
-            }
+            document.getElementById('statusStats').innerHTML = stats;
         }
 
         // Call Tracker
