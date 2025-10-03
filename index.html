@@ -78,12 +78,11 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            transition: all 0.2s;
+            transition: opacity 0.2s;
         }
 
         .btn:hover {
             opacity: 0.9;
-            transform: translateY(-1px);
         }
 
         .btn-filter {
@@ -610,6 +609,32 @@
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         }
 
+        .owner-search-container {
+            position: relative;
+        }
+        .owner-search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 1002;
+            display: none;
+        }
+        .owner-search-item {
+            padding: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .owner-search-item:hover {
+            background: #E8F0FE;
+        }
+
         .modal-header {
             display: flex;
             justify-content: space-between;
@@ -929,10 +954,12 @@
             </div>
             <div class="modal-body">
                 <div class="form-group" style="margin-bottom: 15px;">
-                    <label class="form-label" style="text-align: left;">Select Owner *</label>
-                    <select id="newPropertyOwner" class="form-input">
-                        <option value="">Select an owner...</option>
-                    </select>
+                    <label class="form-label" style="text-align: left;">Search for Owner *</label>
+                    <div class="owner-search-container">
+                        <input type="text" id="newPropertyOwnerSearch" class="form-input" style="text-align: left;" placeholder="Type to search..." oninput="filterOwnerSearch('newPropertyOwner')">
+                        <input type="hidden" id="newPropertyOwner">
+                        <div id="newPropertyOwnerSearchResults" class="owner-search-results"></div>
+                    </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label class="form-label" style="text-align: left;">Property Address *</label>
@@ -1006,8 +1033,12 @@
             <div class="modal-body">
                 <p>Transfer this property to a new owner.</p>
                 <div class="form-group" style="margin-top: 15px;">
-                    <label class="form-label" style="text-align: left;">New Owner</label>
-                    <select id="transferOwnerSelect" class="form-input"></select>
+                    <label class="form-label" style="text-align: left;">Search for New Owner</label>
+                    <div class="owner-search-container">
+                        <input type="text" id="transferOwnerSearch" class="form-input" style="text-align: left;" placeholder="Type to search..." oninput="filterOwnerSearch('transferOwner')">
+                        <input type="hidden" id="transferOwner">
+                        <div id="transferOwnerSearchResults" class="owner-search-results"></div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1356,7 +1387,7 @@
                     <h1 style="font-size: 28px; color: #333;">
                         ${currentOwner.owner_name}
                         <button class="phone-action-btn" onclick="showEditModal('owner', 'owner_name', 'Edit Owner Name', 'Name', currentOwner.owner_name)">✏️</button>
-                         <button class="phone-action-btn" style="color: #c0392b;" onclick="deleteOwner()">🗑️</button>
+                         <button class="phone-action-btn" style="color: #c0392b;" onclick="deleteOwner(this)">🗑️</button>
                     </h1>
                 </div>
             `;
@@ -1424,7 +1455,7 @@
                 <div class="property-header">
                     <div class="property-title">
                         ${currentProperty.address || 'No Address'}
-                        <button class="phone-action-btn" style="color: #c0392b; margin-left: 15px;" onclick="deleteProperty()">🗑️</button>
+                        <button class="phone-action-btn" style="color: #c0392b; margin-left: 15px;" onclick="deleteProperty(this)">🗑️</button>
                     </div>
                     <div class="property-nav">
                         <button class="btn" style="background-color: #e67e22; color: white;" onclick="showTransferPropertyModal()">Transfer</button>
@@ -1570,7 +1601,7 @@
                                 onchange="updateOwner('spoken_${i}', this.checked)">
                         </td>
                         <td style="text-align: center;">
-                            <button class="phone-action-btn" onclick="deletePhone(${i})">🗑️</button>
+                            <button class="phone-action-btn" onclick="deletePhone(this, ${i})">🗑️</button>
                         </td>
                     </tr>
                 `;
@@ -1617,32 +1648,37 @@
                 await renderCenterPanel();
             } catch (error) {
                 console.error('Error updating property:', error);
-                alert('Error updating property. Please try again.');
             }
         }
 
         // Update Owner
         async function updateOwner(field, value) {
             try {
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('owners')
                     .update({ [field]: value })
-                    .eq('id', currentOwner.id);
+                    .eq('id', currentOwner.id)
+                    .select();
 
                 if (error) throw error;
 
-                currentOwner[field] = value;
-
+                // Update local objects with the returned, confirmed data
+                Object.assign(currentOwner, data[0]);
                 const index = allOwners.findIndex(o => o.id === currentOwner.id);
-                if (index !== -1) allOwners[index][field] = value;
+                if (index !== -1) Object.assign(allOwners[index], data[0]);
 
                 if (field === 'marker_pin' || field === 'status_tags') {
                     renderOwnersList();
                 }
+
+                // If the follow-up date changes, refresh the tasks list
+                if (field === 'next_follow_up') {
+                    await loadFollowUpTasks();
+                }
+
                 await renderCenterPanel();
             } catch (error) {
                 console.error('Error updating owner:', error);
-                alert('Error updating owner. Please try again.');
             }
         }
 
@@ -1681,10 +1717,18 @@
         }
 
         // Delete Property
-        async function deleteProperty() {
+        async function deleteProperty(button) {
             if (!currentProperty) return;
 
-            if (!confirm('Are you sure you want to delete this property?')) return;
+            if (!button.classList.contains('are-you-sure')) {
+                button.classList.add('are-you-sure');
+                button.textContent = 'Confirm?';
+                setTimeout(() => {
+                    button.classList.remove('are-you-sure');
+                    button.textContent = '🗑️';
+                }, 3000);
+                return;
+            }
 
             try {
                 const { error } = await supabase
@@ -1704,16 +1748,21 @@
                     currentProperty = null;
                 }
                 await renderCenterPanel();
-
-                alert('Property deleted successfully');
             } catch (error) {
                 console.error('Error deleting property:', error);
-                alert('Error deleting property. Please try again.');
             }
         }
 
-        async function deletePhone(index) {
-            if (!confirm('Are you sure you want to delete this phone number? This will shift all subsequent numbers up.')) return;
+        async function deletePhone(button, index) {
+            if (!button.classList.contains('are-you-sure')) {
+                button.classList.add('are-you-sure');
+                button.textContent = 'Sure?';
+                setTimeout(() => {
+                    button.classList.remove('are-you-sure');
+                    button.textContent = '🗑️';
+                }, 3000);
+                return;
+            }
 
             const updates = {};
             // Shift subsequent phone numbers up
@@ -1738,12 +1787,10 @@
                 // Update local owner object to match
                 Object.assign(currentOwner, updates);
 
-                // Re-render the property details to show the change immediately
                 await renderCenterPanel();
 
             } catch (error) {
                 console.error('Error deleting phone:', error);
-                alert('Error deleting phone. Please try again.');
             }
         }
 
@@ -1781,28 +1828,19 @@
         }
 
         function showAddPropertyModal() {
-            if (!currentOwner) {
-                alert('Please select an owner first.');
-                return;
-            }
             document.getElementById('addPropertyModal').classList.add('active');
+            filterOwnerSearch('newPropertyOwner'); // To show initial list
         }
 
         function showAddLogModal() {
-            if (!currentOwner) {
-                alert('Please select an owner first');
-                return;
-            }
+            if (!currentOwner) return;
             document.getElementById('addLogModal').classList.add('active');
         }
 
         // Add New Owner
         async function addNewOwner() {
             const name = document.getElementById('newOwnerName').value.trim();
-            if (!name) {
-                alert('Please enter an owner name');
-                return;
-            }
+            if (!name) return;
 
             try {
                 const { data, error } = await supabase
@@ -1819,7 +1857,6 @@
 
                 allOwners.push(data[0]);
                 renderOwnersList();
-                populateOwnerSelect();
 
                 closeModal('addOwnerModal');
 
@@ -1828,10 +1865,8 @@
                 document.getElementById('newOwnerEmail').value = '';
                 document.getElementById('newOwnerAddress').value = '';
 
-                alert('Owner added successfully');
             } catch (error) {
                 console.error('Error adding owner:', error);
-                alert('Error adding owner. Please try again.');
             }
         }
 
@@ -1840,14 +1875,7 @@
             const ownerId = document.getElementById('newPropertyOwner').value;
             const address = document.getElementById('newPropertyAddress').value.trim();
 
-            if (!ownerId) {
-                alert('Please select an owner');
-                return;
-            }
-            if (!address) {
-                alert('Please enter a property address');
-                return;
-            }
+            if (!ownerId || !address) return;
 
             try {
                 const owner = allOwners.find(o => o.id === ownerId);
@@ -1869,20 +1897,24 @@
 
                 allProperties.push(data[0]);
 
+                // If currently viewed owner is the one we added to, refresh their view
+                if (currentOwner && currentOwner.id === ownerId) {
+                   await selectOwner(ownerId);
+                }
+
                 closeModal('addPropertyModal');
 
                 // Clear form
                 document.getElementById('newPropertyOwner').value = '';
+                document.getElementById('newPropertyOwnerSearch').value = '';
                 document.getElementById('newPropertyAddress').value = '';
                 document.getElementById('newPropertyName').value = '';
                 document.getElementById('newPropertyCity').value = '';
                 document.getElementById('newPropertyState').value = '';
                 document.getElementById('newPropertyZip').value = '';
 
-                alert('Property added successfully');
             } catch (error) {
                 console.error('Error adding property:', error);
-                alert('Error adding property. Please try again.');
             }
         }
 
@@ -1893,14 +1925,11 @@
             const followUpDate = document.getElementById('newLogFollowUp').value;
             const today = new Date().toISOString();
 
-            if (!type) {
-                alert('Please select a log type.');
-                return;
-            }
+            if (!type) return; // No alert, just exit
 
             try {
                 // 1. Insert the new communication log
-                const { data: logData, error: logError } = await supabase
+                const { data: newLog, error: logError } = await supabase
                     .from('communication_logs')
                     .insert([{
                         owner_id: currentOwner.id,
@@ -1909,43 +1938,57 @@
                         type: type,
                         notes: notes
                     }])
-                    .select();
+                    .select()
+                    .single();
 
                 if (logError) throw logError;
 
-                // 2. Update the owner record with last_spoken and next_follow_up
-                const ownerUpdates = {
-                    last_spoken: today
-                };
+                // 2. Conditionally update the owner record
+                const ownerUpdates = {};
+                // Only update last_spoken if the log type is 'Call'
+                if (type === 'Call') {
+                    ownerUpdates.last_spoken = today;
+                }
                 if (followUpDate) {
                     ownerUpdates.next_follow_up = followUpDate;
                 }
 
-                const { data: ownerData, error: ownerError } = await supabase
-                    .from('owners')
-                    .update(ownerUpdates)
-                    .eq('id', currentOwner.id)
-                    .select()
-                    .single();
+                // Only perform the update if there's something to change
+                if (Object.keys(ownerUpdates).length > 0) {
+                    const { data: updatedOwner, error: ownerError } = await supabase
+                        .from('owners')
+                        .update(ownerUpdates)
+                        .eq('id', currentOwner.id)
+                        .select()
+                        .single();
 
-                if (ownerError) throw ownerError;
+                    if (ownerError) throw ownerError;
 
-                // 3. Update local state and UI
-                currentOwner.logs.unshift(logData[0]); // Add to beginning of logs array
-                Object.assign(currentOwner, ownerUpdates); // Update local owner object
+                    // Update local owner object with confirmed data
+                    Object.assign(currentOwner, updatedOwner);
+                    const index = allOwners.findIndex(o => o.id === currentOwner.id);
+                    if (index !== -1) Object.assign(allOwners[index], updatedOwner);
+                }
+
+                // 3. Update local log state and UI
+                allLogs.push(newLog); // Add to the global logs array
+                currentOwner.logs.unshift(newLog); // Add to the owner's specific logs
 
                 renderCommunicationLogs();
-                // Re-render property details to show updated dates
+
+                // Refresh follow-up tasks if date was changed
+                if (followUpDate) {
+                    await loadFollowUpTasks();
+                }
+
                 await renderCenterPanel();
 
                 closeModal('addLogModal');
                 document.getElementById('newLogNotes').value = '';
                 document.getElementById('newLogFollowUp').value = '';
 
-                alert('Communication log added successfully.');
             } catch (error) {
                 console.error('Error adding log:', error);
-                alert('Error adding log. Please try again.');
             }
         }
 
@@ -1969,13 +2012,6 @@
                     select.appendChild(option);
                 }
             });
-        }
-
-        // Populate owner select in add property modal
-        function populateOwnerSelect() {
-            const select = document.getElementById('newPropertyOwner');
-            select.innerHTML = '<option value="">Select an owner...</option>' +
-                allOwners.map(owner => `<option value="${owner.id}">${owner.owner_name}</option>`).join('');
         }
 
         // Populate Filter Dropdowns with distinct values
@@ -2215,10 +2251,54 @@
             await updateOwner('status_tags', currentTags);
         }
 
+        // Owner Search Component Logic
+        function filterOwnerSearch(prefix) {
+            const input = document.getElementById(`${prefix}Search`);
+            const resultsContainer = document.getElementById(`${prefix}SearchResults`);
+            const hiddenInput = document.getElementById(prefix);
+            const query = input.value.toLowerCase();
+
+            resultsContainer.innerHTML = '';
+            resultsContainer.style.display = 'block';
+
+            const filteredOwners = allOwners.filter(owner =>
+                owner.owner_name.toLowerCase().includes(query) && (!currentOwner || owner.id !== currentOwner.id)
+            );
+
+            if (filteredOwners.length === 0) {
+                resultsContainer.innerHTML = '<div class="owner-search-item">No results</div>';
+                return;
+            }
+
+            filteredOwners.slice(0, 50).forEach(owner => {
+                const item = document.createElement('div');
+                item.className = 'owner-search-item';
+                item.textContent = owner.owner_name;
+                item.onclick = () => selectOwnerFromSearch(prefix, owner.owner_name, owner.id);
+                resultsContainer.appendChild(item);
+            });
+        }
+
+        function selectOwnerFromSearch(prefix, name, id) {
+            document.getElementById(`${prefix}Search`).value = name;
+            document.getElementById(prefix).value = id;
+            document.getElementById(`${prefix}SearchResults`).style.display = 'none';
+        }
+
+
         // Owner/Property Management
-        async function deleteOwner() {
+        async function deleteOwner(button) {
             if (!currentOwner) return;
-            if (!confirm(`Are you sure you want to delete ${currentOwner.owner_name}? This will also delete all associated properties and logs.`)) return;
+
+            if (!button.classList.contains('are-you-sure')) {
+                button.classList.add('are-you-sure');
+                button.textContent = 'Confirm?';
+                setTimeout(() => {
+                    button.classList.remove('are-you-sure');
+                    button.textContent = '🗑️';
+                }, 3000);
+                return;
+            }
 
             try {
                 // This should ideally be a transaction in a real-world scenario
@@ -2226,35 +2306,33 @@
                 await supabase.from('properties').delete().eq('owner_id', currentOwner.id);
                 await supabase.from('owners').delete().eq('id', currentOwner.id);
 
-                alert('Owner deleted successfully.');
                 window.location.reload(); // Simple way to refresh state
             } catch (error) {
                 console.error('Error deleting owner:', error);
-                alert('Failed to delete owner.');
             }
         }
 
         function showTransferPropertyModal() {
             if (!currentProperty) return;
-            const select = document.getElementById('transferOwnerSelect');
-            select.innerHTML = allOwners
-                .filter(o => o.id !== currentOwner.id)
-                .map(o => `<option value="${o.id}">${o.owner_name}</option>`)
-                .join('');
             document.getElementById('transferPropertyModal').classList.add('active');
+            filterOwnerSearch('transferOwner');
         }
 
         async function transferProperty() {
-            const newOwnerId = document.getElementById('transferOwnerSelect').value;
-            if (!newOwnerId) {
-                alert('Please select a new owner.');
-                return;
-            }
+            const newOwnerId = document.getElementById('transferOwner').value;
+            if (!newOwnerId) return;
 
+            const oldOwnerId = currentOwner.id;
+
+            // Reassign owner_id and owner_name for the property
+            const newOwner = allOwners.find(o => o.id === newOwnerId);
             await updateProperty('owner_id', newOwnerId);
-            alert('Property transferred successfully.');
+            await updateProperty('owner_name', newOwner.owner_name);
+
             closeModal('transferPropertyModal');
-            selectOwner(newOwnerId); // Switch to the new owner's view
+
+            // Refresh the old owner's view (property will be gone)
+            await selectOwner(oldOwnerId);
         }
 
         function addPhoneRow() {
@@ -2267,10 +2345,7 @@
                 }
             }
 
-            if (nextIndex === -1) {
-                alert("Maximum number of phone lines reached.");
-                return;
-            }
+            if (nextIndex === -1) return;
 
             const newRow = document.createElement('tr');
             newRow.innerHTML = `
