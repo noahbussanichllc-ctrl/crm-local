@@ -799,54 +799,6 @@
         select.status-dropdown option {
             padding: 5px;
         }
-
-        /* New Map View Styles */
-        #mapView {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2000;
-            background: #fff;
-        }
-
-        #fullScreenMap {
-            width: 100%;
-            height: 100%;
-        }
-
-        #mapInfoPanel {
-            position: absolute;
-            left: -450px; /* Hidden by default */
-            top: 0;
-            width: 420px;
-            height: 100vh;
-            background: white;
-            z-index: 2001;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.2);
-            transition: left 0.3s ease-in-out;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        #mapInfoPanel.active {
-            left: 0;
-        }
-
-        #backToCrmBtn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 2002;
-            padding: 10px 20px;
-            background: #2B5AA8;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-        }
     </style>
 </head>
 <body>
@@ -859,7 +811,6 @@
         <button class="btn btn-filter" onclick="toggleFilters()">▼ Filter Properties</button>
         <button class="btn btn-status" onclick="showStatusBreakdown()">📊 Status Breakdown</button>
         <button class="btn btn-call" onclick="showCallTracker()">📞 Call Tracker</button>
-        <button class="btn" onclick="toggleMapView()" style="background: #4CAF50; color: white;">🗺️ Map</button>
         <button class="btn btn-add-owner" onclick="showAddOwnerModal()">+ Add Owner</button>
         <button class="btn btn-add-property" onclick="showAddPropertyModal()">+ Add Property</button>
     </div>
@@ -1013,17 +964,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Map View (New Full-Screen Interface) -->
-    <div id="mapView" style="display: none;">
-        <!-- This container will be positioned and styled by new CSS rules -->
-        <button id="backToCrmBtn" onclick="toggleMapView()">← Back to CRM</button>
-        <div id="mapInfoPanel">
-            <!-- Info panel content will be dynamically generated -->
-        </div>
-        <div id="fullScreenMap"></div>
-    </div>
-
 
     <!-- Add Owner Modal -->
     <div id="addOwnerModal" class="modal">
@@ -1232,8 +1172,6 @@
         let map = null;
         let marker = null;
         let propertyMarkers = [];
-        let fullScreenMap = null; // For the new map view
-        let allPropertyMarkers = []; // Markers for the full screen map
 
         // Performance-related state
         let searchDebounceTimer;
@@ -2156,11 +2094,6 @@
                 renderCommunicationLogs();
                 closeModal('editLogModal');
 
-                // If map view is active, refresh the info panel
-                if (document.getElementById('mapView').style.display === 'block') {
-                    showMapInfoPanel(currentOwner.id, currentProperty.id);
-                }
-
             } catch (error) {
                 console.error('Error updating log:', error);
             }
@@ -2187,11 +2120,6 @@
 
                     renderCommunicationLogs();
                     closeModal('editLogModal');
-
-                    // If map view is active, refresh the info panel
-                    if (document.getElementById('mapView').style.display === 'block') {
-                        showMapInfoPanel(currentOwner.id, currentProperty.id);
-                    }
 
                 } catch (error) {
                     console.error('Error deleting log:', error);
@@ -2349,11 +2277,6 @@
                 closeModal('addLogModal');
                 document.getElementById('newLogNotes').value = '';
                 document.getElementById('newLogFollowUp').value = '';
-
-                // If map view is active, refresh the info panel
-                if (document.getElementById('mapView').style.display === 'block') {
-                    showMapInfoPanel(currentOwner.id, currentProperty.id);
-                }
 
             } catch (error) {
                 console.error('Error adding log:', error);
@@ -2755,128 +2678,6 @@
                 </td>
             `;
             phoneTableBody.appendChild(newRow);
-        }
-
-        // --- NEW MAP FEATURE FUNCTIONS ---
-
-        function toggleMapView() {
-            const mapView = document.getElementById('mapView');
-            const crmView = document.querySelector('.container');
-            const topBar = document.querySelector('.top-bar');
-            const filterPanel = document.getElementById('filterPanel');
-
-            const isHidden = mapView.style.display === 'none';
-
-            if (isHidden) {
-                mapView.style.display = 'block';
-                crmView.style.display = 'none';
-                topBar.style.display = 'none';
-                filterPanel.style.display = 'none'; // Ensure filter panel is also hidden
-
-                if (!fullScreenMap) {
-                    initFullScreenMap();
-                }
-            } else {
-                mapView.style.display = 'none';
-                crmView.style.display = 'flex';
-                topBar.style.display = 'flex';
-                document.getElementById('mapInfoPanel').classList.remove('active'); // Hide panel on exit
-            }
-        }
-
-        function initFullScreenMap() {
-            if (document.getElementById('fullScreenMap') && !fullScreenMap) {
-                fullScreenMap = L.map('fullScreenMap').setView([45.5231, -122.6765], 10);
-                L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-                    attribution: '© Google Maps'
-                }).addTo(fullScreenMap);
-
-                plotAllProperties();
-            }
-        }
-
-        function plotAllProperties() {
-            allPropertyMarkers.forEach(marker => marker.remove());
-            allPropertyMarkers = [];
-
-            const propertyOwnerMap = new Map(allOwners.map(owner => [owner.id, owner]));
-
-            allProperties.forEach(prop => {
-                if (prop.latt && prop.long) {
-                    const lat = parseFloat(prop.latt);
-                    const lng = parseFloat(prop.long);
-                    if (!isNaN(lat) && !isNaN(lng)) {
-                        const owner = propertyOwnerMap.get(prop.owner_id);
-                        const statusColor = owner ? (STATUS_OPTIONS[owner.marker_pin] || '#6c757d') : '#6c757d';
-
-                        const marker = L.marker([lat, lng], {
-                            icon: L.divIcon({
-                                className: 'custom-div-icon',
-                                html: `<div style='background-color:${statusColor};' class='marker-pin'></div>`,
-                                iconSize: [30, 42],
-                                iconAnchor: [15, 42]
-                            })
-                        }).addTo(fullScreenMap);
-
-                        marker.on('click', () => showMapInfoPanel(prop.owner_id, prop.id));
-                        allPropertyMarkers.push(marker);
-                    }
-                }
-            });
-        }
-
-        async function showMapInfoPanel(ownerId, propertyId) {
-            currentOwner = allOwners.find(o => o.id === ownerId);
-            currentProperty = allProperties.find(p => p.id === propertyId);
-            if (!currentOwner) return;
-
-            currentOwner.logs = allLogs.filter(log => log.owner_id === currentOwner.id);
-
-            const panel = document.getElementById('mapInfoPanel');
-
-            const ownerHeaderHtml = `
-                <div style="text-align: center; margin-bottom: 10px;">
-                    <h2 style="font-size: 22px; color: #333;">${currentOwner.owner_name}</h2>
-                </div>`;
-
-            const propertyDetailsHtml = currentProperty ? `
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
-                    <h4 style="margin-bottom: 5px;">${currentProperty.property_name || currentProperty.address}</h4>
-                    <p style="font-size: 13px; color: #666;">${currentProperty.city}, ${currentProperty.units || 'N/A'} units</p>
-                </div>` : '';
-
-            const ownerInfoHtml = `
-                <div class="section-title" style="font-size: 14px; margin-top: 15px;">Owner Info</div>
-                <p style="font-size: 13px;"><strong>Status:</strong> <span style="color: ${STATUS_OPTIONS[currentOwner.marker_pin] || '#666'}">${currentOwner.marker_pin}</span></p>
-                <p style="font-size: 13px;"><strong>Email:</strong> ${currentOwner.owner_email || 'N/A'}</p>
-                <p style="font-size: 13px;"><strong>Phone:</strong> ${currentOwner.phone_number_1 || 'N/A'} <a href="tel:${currentOwner.phone_number_1}" style="text-decoration: none;">📞</a></p>
-            `;
-
-            const ownerLogs = allLogs.filter(log => log.owner_id === currentOwner.id).sort((a,b) => new Date(b.date) - new Date(a.date));
-            const logsHtml = ownerLogs.map(log => `
-                <div class="log-item">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <div class="log-date">${formatDate(log.date)}</div>
-                        <button class="phone-action-btn" style="font-size: 14px;" onclick='showEditLogModal(${JSON.stringify(log)})'>✏️ Edit</button>
-                    </div>
-                    <div class="log-type">${log.type || 'Note'}</div>
-                    <div class="log-notes">${log.notes || 'No notes'}</div>
-                </div>
-            `).join('');
-
-            const logSectionHtml = `
-                 <div class="log-section">
-                    <div class="log-header" style="padding: 15px 0 10px 0; border-bottom: 1px solid #eee; margin-bottom: 10px;">
-                        <div class="log-title">Communication Log</div>
-                        <button class="btn-log-call" onclick="showAddLogModal()">+ Add Log</button>
-                    </div>
-                    <div class="log-list" style="height: 40vh; overflow-y: auto; padding-right: 10px;">
-                        ${ownerLogs.length > 0 ? logsHtml : '<div class="no-logs">No communication history</div>'}
-                    </div>
-                </div>`;
-
-            panel.innerHTML = ownerHeaderHtml + propertyDetailsHtml + ownerInfoHtml + logSectionHtml;
-            panel.classList.add('active');
         }
     </script>
 </body>
