@@ -915,7 +915,14 @@
                 </div>
             </div>
             <div class="follow-up-section">
-                <div class="panel-header">Follow-Up Tasks (<span id="followUpCount">0</span>)</div>
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Follow-Up Tasks (<span id="followUpCount">0</span>)</span>
+                    <select id="followUpFilter" onchange="loadFollowUpTasks()" style="font-size: 12px; padding: 2px;">
+                        <option value="today">Today's Tasks</option>
+                        <option value="overdue">Overdue Tasks</option>
+                        <option value="all">All Tasks</option>
+                    </select>
+                </div>
                 <div class="follow-up-list" id="followUpList">
                     <div class="loading">Loading tasks...</div>
                 </div>
@@ -1298,40 +1305,43 @@
         }
 
         // Load and Render Follow-Up Tasks
-        async function loadFollowUpTasks() {
+        function loadFollowUpTasks() {
             const followUpList = document.getElementById('followUpList');
             const followUpCount = document.getElementById('followUpCount');
-            followUpList.innerHTML = '<div class="loading">Loading tasks...</div>';
+            const filter = document.getElementById('followUpFilter').value;
+            const today = document.getElementById('datePicker').value;
 
-            try {
-                const today = new Date().toISOString().split('T')[0];
-                const { data, error } = await supabase
-                    .from('owners')
-                    .select('id, owner_name, next_follow_up')
-                    .lte('next_follow_up', today)
-                    .order('next_follow_up', { ascending: true });
+            followUpList.innerHTML = ''; // Clear previous list
 
-                if (error) throw error;
+            let tasks = [];
+            const ownersWithFollowUp = allOwners.filter(o => o.next_follow_up);
 
-                followUpCount.textContent = data.length;
-                if (data.length === 0) {
-                    followUpList.innerHTML = '<div style="padding: 15px; color: #666; font-size: 14px;">No tasks found.</div>';
-                    return;
-                }
+            if (filter === 'today') {
+                tasks = ownersWithFollowUp.filter(o => o.next_follow_up === today);
+            } else if (filter === 'overdue') {
+                tasks = ownersWithFollowUp.filter(o => o.next_follow_up < today);
+            } else { // 'all'
+                tasks = ownersWithFollowUp;
+            }
 
-                followUpList.innerHTML = data.map(task => `
-                    <div class="owner-item" onclick="selectOwner('${task.id}')" style="padding: 10px;">
-                        <div class="owner-info">
-                            <div class="owner-name">${task.owner_name}</div>
-                            <div class="owner-properties" style="color: #c0392b;">Due: ${formatDate(task.next_follow_up)}</div>
+            tasks.sort((a, b) => new Date(a.next_follow_up) - new Date(b.next_follow_up));
+
+            followUpCount.textContent = tasks.length;
+            if (tasks.length === 0) {
+                followUpList.innerHTML = '<div style="padding: 15px; color: #666; font-size: 14px;">No tasks found.</div>';
+                return;
+            }
+
+            followUpList.innerHTML = tasks.map(task => `
+                <div class="owner-item" onclick="selectOwner('${task.id}')" style="padding: 10px;">
+                    <div class="owner-info">
+                        <div class="owner-name">${task.owner_name}</div>
+                        <div class="owner-properties" style="color: ${task.next_follow_up < today ? '#c0392b' : '#333'};">
+                            Due: ${formatDate(task.next_follow_up)}
                         </div>
                     </div>
-                `).join('');
-
-            } catch (error) {
-                console.error("Error loading follow-up tasks:", error);
-                followUpList.innerHTML = '<div class="loading">Error loading tasks.</div>';
-            }
+                </div>
+            `).join('');
         }
 
         function highlightField(value) {
@@ -1708,7 +1718,7 @@
 
                 // If the follow-up date changes, refresh the tasks list
                 if (field === 'next_follow_up') {
-                    await loadFollowUpTasks();
+                    loadFollowUpTasks();
                 }
 
                 await renderCenterPanel();
@@ -2056,7 +2066,7 @@
 
                 // Refresh follow-up tasks if date was changed
                 if (followUpDate) {
-                    await loadFollowUpTasks();
+                    loadFollowUpTasks();
                 }
 
                 await renderCenterPanel();
